@@ -10,7 +10,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// like "uint%d_t", addr_bits
 typedef RPCPTR_INTERNAL_TYPE rpcptr_t;
 
 /*
@@ -26,11 +25,11 @@ typedef struct {
   rpcptr_t HP;       // heap pointer
   rpcptr_t HPOFFSET; // heap pointer offset, used when compressing
   char *DATA;
-} *rpcmem_t;
+} rpcmem_t;
 
-rpcmem_t rpcmem_new();
-void rpcmem_free(rpcmem_t *mem_pp);
-int rpcmem_tobuf(const rpcmem_t mem, const void *outbuf);
+rpcmem_t *rpcmem_new();
+void rpcmem_free(rpcmem_t **mem_pp);
+int rpcmem_tobuf(const rpcmem_t *mem, const void *outbuf);
 rpcmem_t *rpcmem_frombuf(void *inbuf, int len);
 
 /*
@@ -94,7 +93,8 @@ rpcmem_t *rpcmem_frombuf(void *inbuf, int len);
  *
  * To do it with arrays
  *
- * PUSH(ARRAY, <c_exp>, <type>, <c_exp>);
+ * PUSH(<type>, <c_exp array>, <c_exp length>);
+ * POP(<type>, <c_exp array>, <c_exp length>);
  *
  * */
 
@@ -118,11 +118,11 @@ POPDEF(INT, int) {
 }
 
 PUSHDEF(BOOL, bool b) { 
-  PUSH(INT, (int)b);
+  PUSH(U8, (char)b);
 }
 
 POPDEF(BOOL, bool) {
-  POP(INT, return);
+  POP(U8, return);
 }
 
 PUSHDEF(FLOAT, float f) {
