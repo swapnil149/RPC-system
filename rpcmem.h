@@ -4,6 +4,7 @@
 // clang-format off
 
 // variable size based on addr_bits
+#include <stdio.h>
 #define RPCADDR_BITS 16
 
 #include "rpcasm.h"
@@ -23,21 +24,24 @@ typedef RPCPTR_INTERNAL_TYPE rpcptr_t;
 typedef struct {
   rpcptr_t SP;       // stack pointer
   rpcptr_t HP;       // heap pointer
-  rpcptr_t HPOFFSET; // heap pointer offset, used when compressing
   char *DATA;
 } rpcmem_t;
 
 rpcmem_t *rpcmem_new();
 void rpcmem_free(rpcmem_t **mem_pp);
-int rpcmem_tobuf(const rpcmem_t *mem, const void *outbuf);
-rpcmem_t *rpcmem_frombuf(void *inbuf, int len);
+
+// returns total length of buffer
+int rpcmem_tobuf(const char *fname, const rpcmem_t *MEM, void **outbuf);
+
+// returns function name
+char *rpcmem_frombuf(const void *inbuf, int len, rpcmem_t *MEM);
 
 /*
  * RPC Assembly Embedded Language, implemented with C preprocessor
  * ---------------------------------------------------------------
  * Implicitly requires an in-scope `rpcmem_t *mem` to call from normal c
  *
- * RPC ASM Language reference:
+ * RPC Stack Language reference:
  *
  * Operations
  * ----------
@@ -93,23 +97,30 @@ rpcmem_t *rpcmem_frombuf(void *inbuf, int len);
  *
  * To do it with arrays
  *
- * PUSH(<type>, <c_exp array>, <c_exp length>);
- * POP(<type>, <c_exp array>, <c_exp length>);
+ * For example
+ * int x[80][2][9];
+ * int y[80][2][9];
  *
+ * PUSH(INT, x, 80, 2, 9);
+ * POP(INT, y, 80, 2, 9);
+ *
+ * assert(x[] == y[])
  * */
 
 /*
  * Initial RPC Assembly Language Basis
  */
 
+#include <stdio.h>
+
 PUSHDEF(INT, int x) {
-  for (int i = sizeof(x) - 1; i >= 0; i--)
-    PUSH(U8, x >> (8 * i));
+  for (int i = sizeof(x) - 1; i >= 0; i--) 
+    PUSH(U8, (unsigned char)(x >> (8 * i)));
 }
 
 POPDEF(INT, int) {
-  char c;
-  int x;
+  unsigned char c;
+  int x = 0;
   for (int i = 0; i < sizeof(x); i++) {
     POP(U8, c);
     x |= c << (8 * i);
@@ -137,12 +148,12 @@ POPDEF(FLOAT, float) {
 
 PUSHDEF(RPCPTR, rpcptr_t p) {
   for (int i = sizeof(p) - 1; i >= 0; i--)
-    PUSH(U8, p >> (8 * i));
+    PUSH(U8, (unsigned char)(p >> (8 * i)));
 }
 
 POPDEF(RPCPTR, rpcptr_t) {
-  char c;
-  rpcptr_t p;
+  unsigned char c;
+  rpcptr_t p = 0;
   for (int i = 0; i < sizeof(p); i++) {
     POP(U8, c);
     p |= c << (8 * i);

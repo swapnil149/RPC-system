@@ -93,4 +93,8 @@
   )
 #define _MAP() MAP
 
+#define GREET(...) IF_ELSE(HAS_ARGS(__VA_ARGS__))(Hello, __VA_ARGS__ !)()
+
+EVAL(MAP(GREET, ))
+
 #endif

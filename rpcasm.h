@@ -26,10 +26,9 @@
 #define MEM __mem
 
 /* Names of the memory unit fields */
-#define SP __sp             // stack pointer
-#define HP __hp             // heap pointer
-#define HPOFFSET __hpoffset // heap offset
-#define DATA __data         // memory
+#define SP __sp     // stack pointer
+#define HP __hp     // heap pointer
+#define DATA __data // memory
 
 /* Stuff dependent on bit address size */
 
@@ -47,7 +46,6 @@
 /* VIRTUAL HARDWARE REGISTERS */
 #define RSP       MEM->SP
 #define RHP       MEM->HP
-#define RHPO      MEM->HPOFFSET 
 #define RDATA     MEM->DATA
 
 /* STACK ISA */
@@ -56,15 +54,15 @@
 
 /* HEAP ISA */
 #define SBRK(n)                 (RHP = RHP - (n), RHP)
-#define STORE(byte, rpc_addr)   RDATA[(rpc_addr) + RHPO] = (byte)
-#define LOAD(rpc_addr, cpp_var) (cpp_var) = RDATA[(rpc_addr) + RHPO]
+#define STORE(byte, rpc_addr)   RDATA[(rpc_addr)] = (byte)
+#define LOAD(rpc_addr, cpp_var) (cpp_var) = RDATA[(rpc_addr)]
 
 /* DEFINE A CUSTOM ROUTINE */ 
 
 #define PUSHDEF(type, ...)  \
-  inline void CAT(PUSH_,type)(__VA_ARGS__, rpcmem_t *MEM)
+  extern inline void CAT(PUSH_,type)(__VA_ARGS__, rpcmem_t *MEM)
 #define POPDEF(type, rtcty) \
-  inline rtcty CAT(POP_,type)(rpcmem_t *MEM)
+  extern inline rtcty CAT(POP_,type)(rpcmem_t *MEM)
 
 /* CALLING ROUTINES */
 
@@ -80,9 +78,9 @@
      (a = CAT(POP_, type) (MEM))
 
 /* ARRAY CASE */
-#define POP__ARRAY(type, a, n)    \
-  for (int i = (n); i > 0; i++) { \
-    POP__ONE(type, a[i - 1]);     \
+#define POP__ARRAY(type, a, ...)    \
+  for (int i = SUM(__VA_ARGS__); i > 0; i--) { \
+    POP__ONE(type, MULTIINDEX(a, i - 1, __VA_ARGS__));     \
   } 
 
 #define PUSH__ARRAY(type, a, ...)                   \
@@ -90,14 +88,13 @@
     PUSH__ONE(type, MULTIINDEX(a, i, __VA_ARGS__)); \
   }
 
-#define SUM(a, b, ...) ((a) * (b) EVAL(MAP(_MULTLAST, __VA_ARGS__)))
-#define _MULTLAST(x) * (x)
+#define SUM(a, ...) ((a) EVAL(MAP(_MULTLAST, __VA_ARGS__)))
+#define _MULTLAST(x) IF_ELSE(HAS_ARGS(x))(* (x))()
 
 // for nd array `x` index with `x[0]...[0][i]` where all indexes < n are 0
 #define MULTIINDEX(x, i, ...) x _INDEXERS_(__VA_ARGS__)[i]
-#define ZEROINDEX(...) [0]
+#define ZEROINDEX(x) IF_ELSE(HAS_ARGS(x))([0])()
 #define _INDEXERS_(_, ...) EVAL(MAP(ZEROINDEX, __VA_ARGS__))
-
 
 /* HELPFUL STUFF */
 
