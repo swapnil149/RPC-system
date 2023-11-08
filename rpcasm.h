@@ -32,13 +32,18 @@
 
 /* Stuff dependent on bit address size */
 
-/* make the type like printf("uint%d_t", addr_bits) */
-#define RPCPTR_TYPE CAT3(uint, RPCADDR_BITS, _t)
-
 #if RPCADDR_BITS > 16
 #define MEM_CAPACITY ((1U << 20) - 1) // 1mb
 #else
 #define MEM_CAPACITY ((1U << RPCADDR_BITS) - 1) // 64kb
+#endif
+
+#if RPCADDR_BITS == 64
+#define RPCPTR_TYPE unsigned long
+#elif RPCADDR_BITS == 32
+#define RPCPTR_TYPE unsigned int
+#elif RPCADDR_BITS == 16
+#define RPCPTR_TYPE short
 #endif
 
 // clang-format off

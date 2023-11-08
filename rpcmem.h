@@ -1,10 +1,8 @@
 #ifndef RPCMEM_H
 #define RPCMEM_H
 
-#include <assert.h>
+#include "debugmacros.h"
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 // clang-format off
 
@@ -12,6 +10,7 @@
 #define RPCADDR_BITS 16
 
 #define MAX_IDL_FNAME_LEN 80
+#define MAX_PREFIX_LEN (MAX_IDL_FNAME_LEN + 40)
 
 #include "rpcasm.h"
 
@@ -24,47 +23,41 @@ typedef RPCPTR_TYPE rpcptr_t;
  * heap offset (used when compressing memory for transfer) and memory.  
  *
  * Using the RPC Assembly language these ops can be composed at a higher level
+ *
+ * MEM_CAPACITY is the size of the data segment. It is defined by "rpcasm.h".
  **/
 typedef struct {
-  rpcptr_t SP;       // stack pointer
-  rpcptr_t HP;       // heap pointer
-  char *DATA;
+  rpcptr_t SP;             // stack pointer
+  rpcptr_t HP;             // heap pointer
+  char DATA[MEM_CAPACITY]; // data segment 
 } rpcmem_t;
 
+// pre-allocate all memory
+static char     global_transmit_buffer[MEM_CAPACITY + MAX_PREFIX_LEN] = {0};
+static rpcmem_t global_rpc_memory_unit = {
+  .SP = 0,
+  .HP = (rpcptr_t)MEM_CAPACITY,
+  .DATA = {0},
+};
+static rpcmem_t *MEM = &global_rpc_memory_unit;
 
-static rpcmem_t *rpcmem_new() {
-  rpcmem_t *MEM = (rpcmem_t *)malloc(sizeof(*MEM));
-  RDATA = (char*)malloc(MEM_CAPACITY);
-  RSP = 0;
-  RHP = (rpcptr_t)MEM_CAPACITY;
-  memset(RDATA, 0, MEM_CAPACITY);
-  return MEM;
+static void cpymem(void *dst, const void *src, unsigned long n) {
+  for (int i = 0; i < n; i++)
+    ((char*)dst)[i] = ((char*)src)[i];
 }
-
-static void rpcmem_free(rpcmem_t **mem_pp) {
-  rpcmem_t *MEM = *mem_pp;
-  free(RDATA);
-  free(*mem_pp);
-  *mem_pp = NULL;
-}
-
-#define MAX_PREFIX_LEN (MAX_IDL_FNAME_LEN + 40)
 
 // returns total length of buffer
-static int rpcmem_tobuf(const char *fname, const rpcmem_t *MEM, char **outbuf) {
-  char prefix[MAX_IDL_FNAME_LEN + 40];
-
+static int rpcmem_tobuf(const char *fname, const rpcmem_t *MEM, char *outbuf) {
   // special format string to prevent buffer overflow attack
+  char prefix[MAX_PREFIX_LEN];
   int prefixlen = snprintf(prefix, MAX_PREFIX_LEN, "%" STRINGIFY(MAX_IDL_FNAME_LEN) "s %d %d",
                           fname, RSP, RHP);
-  assert(prefixlen < MAX_PREFIX_LEN);
-    
-  int buflen = prefixlen + RSP + (MEM_CAPACITY - RHP);
-  *outbuf = (char*)malloc(buflen);
-  memcpy(*outbuf                  , prefix     , prefixlen);
-  memcpy(*outbuf + prefixlen      , RDATA      , RSP);
-  memcpy(*outbuf + prefixlen + RSP, RDATA + RHP, (MEM_CAPACITY - RHP));
-  return buflen;
+  ASSERT(prefixlen < MAX_PREFIX_LEN);
+
+  cpymem(outbuf                  , prefix     , prefixlen);
+  cpymem(outbuf + prefixlen      , RDATA      , RSP);
+  cpymem(outbuf + prefixlen + RSP, RDATA + RHP, MEM_CAPACITY - RHP);
+  return prefixlen + RSP + (MEM_CAPACITY - RHP);
 }
 
 #undef MAX_PREFIX_LEN
@@ -79,8 +72,8 @@ static void rpcmem_frombuf(const char *inbuf, rpcmem_t *MEM,
          &heapptr, &prefixlen);
   RSP = stackptr;
   RHP = heapptr;
-  memcpy(RDATA      , inbuf + prefixlen      , RSP);
-  memcpy(RDATA + RHP, inbuf + prefixlen + RSP, MEM_CAPACITY - RHP);
+  cpymem(RDATA      , inbuf + prefixlen      , RSP);
+  cpymem(RDATA + RHP, inbuf + prefixlen + RSP, MEM_CAPACITY - RHP);
 }
 
 

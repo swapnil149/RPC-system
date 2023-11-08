@@ -1,17 +1,8 @@
-#include <stdbool.h>
-#include <stdio.h>
-#include <string.h>
 
+#include "debugmacros.h"
 #include "rpcmem.h"
-#include <stdlib.h>
-
-#define DEBUGINT(x) fprintf(stderr, #x ": %d\n", x);
-#define DEBUGBOOL(x) fprintf(stderr, #x ": %s\n", x ? "true" : "false");
-#define DEBUGPTR(x) fprintf(stderr, #x ": 0x%04x\n", x);
 
 int main() {
-  rpcmem_t *MEM = rpcmem_new();
-
   int x = 4487, y = -4322;
   bool b = true;
   rpcptr_t ptr = 0x41;
@@ -49,17 +40,15 @@ int main() {
   DEBUGINT(triple_array[6][1][2]);
   DEBUGINT(triple_array[6][2][2]);
 
-  char *buf;
+  rpcmem_tobuf("regression_test", MEM, global_transmit_buffer);
 
-  rpcmem_tobuf("regression_test", MEM, &buf);
-
-  // reset mem
-  rpcmem_free(&MEM);
-  MEM = rpcmem_new();
+  // reset memory unit
+  RSP = -1;
+  RHP = -1;
+  memset(RDATA, -1, MEM_CAPACITY);
 
   char fname[MAX_IDL_FNAME_LEN];
-
-  rpcmem_frombuf(buf, MEM, fname);
+  rpcmem_frombuf(global_transmit_buffer, MEM, fname);
 
   fprintf(stderr, "received: %s\n", fname);
 
@@ -80,9 +69,6 @@ int main() {
   DEBUGPTR(ptr);
   DEBUGINT(x);
   DEBUGINT(y);
-
-  rpcmem_free(&MEM);
-  free(buf);
 
   return 0;
 }
