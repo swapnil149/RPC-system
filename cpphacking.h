@@ -95,6 +95,7 @@
 
 #define GREET(...) IF_ELSE(HAS_ARGS(__VA_ARGS__))(Hello, __VA_ARGS__ !)()
 
-EVAL(MAP(GREET, ))
+#define _STRINGIFY_(x) #x
+#define STRINGIFY(x) _STRINGIFY_(x)
 
 #endif

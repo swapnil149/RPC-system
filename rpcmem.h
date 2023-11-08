@@ -1,6 +1,11 @@
 #ifndef RPCMEM_H
 #define RPCMEM_H
 
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 // clang-format off
 
 // variable size based on addr_bits
@@ -9,8 +14,6 @@
 #define MAX_IDL_FNAME_LEN 80
 
 #include "rpcasm.h"
-#include <stdbool.h>
-#include <stdint.h>
 
 typedef RPCPTR_TYPE rpcptr_t;
 
@@ -28,15 +31,58 @@ typedef struct {
   char *DATA;
 } rpcmem_t;
 
-rpcmem_t *rpcmem_new();
-void rpcmem_free(rpcmem_t **mem_pp);
+
+static rpcmem_t *rpcmem_new() {
+  rpcmem_t *MEM = (rpcmem_t *)malloc(sizeof(*MEM));
+  RDATA = (char*)malloc(MEM_CAPACITY);
+  RSP = 0;
+  RHP = (rpcptr_t)MEM_CAPACITY;
+  memset(RDATA, 0, MEM_CAPACITY);
+  return MEM;
+}
+
+static void rpcmem_free(rpcmem_t **mem_pp) {
+  rpcmem_t *MEM = *mem_pp;
+  free(RDATA);
+  free(*mem_pp);
+  *mem_pp = NULL;
+}
+
+#define MAX_PREFIX_LEN (MAX_IDL_FNAME_LEN + 40)
 
 // returns total length of buffer
-int rpcmem_tobuf(const char *fname, const rpcmem_t *MEM, void **outbuf);
+static int rpcmem_tobuf(const char *fname, const rpcmem_t *MEM, char **outbuf) {
+  char prefix[MAX_IDL_FNAME_LEN + 40];
+
+  // special format string to prevent buffer overflow attack
+  int prefixlen = snprintf(prefix, MAX_PREFIX_LEN, "%" STRINGIFY(MAX_IDL_FNAME_LEN) "s %d %d",
+                          fname, RSP, RHP);
+  assert(prefixlen < MAX_PREFIX_LEN);
+    
+  int buflen = prefixlen + RSP + (MEM_CAPACITY - RHP);
+  *outbuf = (char*)malloc(buflen);
+  memcpy(*outbuf                  , prefix     , prefixlen);
+  memcpy(*outbuf + prefixlen      , RDATA      , RSP);
+  memcpy(*outbuf + prefixlen + RSP, RDATA + RHP, (MEM_CAPACITY - RHP));
+  return buflen;
+}
+
+#undef MAX_PREFIX_LEN
 
 // returns function name
-void rpcmem_frombuf(const void *inbuf, rpcmem_t *MEM,
-                    char fname[MAX_IDL_FNAME_LEN]);
+static void rpcmem_frombuf(const char *inbuf, rpcmem_t *MEM,
+                    char fname[MAX_IDL_FNAME_LEN]) {
+  int stackptr, heapptr, prefixlen;
+
+  // special format string to prevent buffer overflow attack
+  sscanf(inbuf, "%" STRINGIFY(MAX_IDL_FNAME_LEN) "s %d %d%n", fname, &stackptr,
+         &heapptr, &prefixlen);
+  RSP = stackptr;
+  RHP = heapptr;
+  memcpy(RDATA      , inbuf + prefixlen      , RSP);
+  memcpy(RDATA + RHP, inbuf + prefixlen + RSP, MEM_CAPACITY - RHP);
+}
+
 
 /*
  * RPC Assembly Embedded Language, implemented with C preprocessor

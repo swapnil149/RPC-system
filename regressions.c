@@ -49,7 +49,7 @@ int main() {
   DEBUGINT(triple_array[6][1][2]);
   DEBUGINT(triple_array[6][2][2]);
 
-  void *buf;
+  char *buf;
 
   rpcmem_tobuf("regression_test", MEM, &buf);
 
