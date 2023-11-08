@@ -1,13 +1,6 @@
 #ifndef RPCASM_H
 #define RPCASM_H
 
-// Hiding the sort of ugly...
-//
-// Recommended reading:
-// http://jhnet.co.uk/articles/cpp_magic
-//
-// See cpphacking.h for more
-
 /*
  * Implementation of the embedded RPC ASM language
  *
@@ -17,6 +10,25 @@
  *
  * See rpcmem.h for language reference and tutorial
  */
+
+// See naughtycpp.h for more nitty gritty preprocessor hacking
+//
+// From it we use the following magic macros
+// - CAT(a, b)
+// - EVAL(MAP(F, x1, ..., x20))
+//   - Expands to `F(x1) ... F(x20)`
+// - IF_2_OR_MORE_ARGS(...)(true syntax)(false syntax)
+//   - Expands `IF_2_OR_MORE_ARGS(a, b)(ts)(fs)` to `ts`
+//   - Expands `IF_2_OR_MORE_ARGS(a)(ts)(fs)`    to `fs`
+// - IF_RETURN(x)(true syntax)(false syntax)
+//   - Expands to `true syntax` iff x == `return`
+// - IF_ELSE(x)(true)(false)
+//   - Expands to `false` iff x == `0`
+// - HAS_ARGS(...)
+//   - Expands to `1` iff number of args > 0, otherwise `0`
+// - NUM_ARGS(...)
+//   - Expands to number of arguments from [0, 20]
+#include "naughtycpp.h"
 
 #ifndef RPCADDR_BITS
 #define RPCADDR_BITS 16

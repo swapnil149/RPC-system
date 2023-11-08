@@ -6,6 +6,9 @@
  * Things get pretty ugly in here — but they work.
  * Our best excuse is that you don't get mad at gcc for it's internal spagetti.
  *
+ * Recommended reading:
+ * http://jhnet.co.uk/articles/cpp_magic
+ *
  * Also principle of least power, amirite? :D
  * */
 
@@ -40,9 +43,17 @@
 #define _IF_ARRAY(...) _IF_ARRAY_ELSE
 #define _IF_ARRAY_ELSE(...) __VA_ARGS__
 
-#define NUM_ARGS_IMPL(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, N, ...) N
+// can externally define this macro to support more numbers
+#ifndef NUM_ARGS_IMPL
+#define NUM_ARGS_IMPL(_1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13,  \
+                      _14, _15, _16, _17, _18, _19, _20, N, ...)               \
+  N
+#endif
+#ifndef NUM_ARGS
 #define NUM_ARGS(...)                                                          \
-  NUM_ARGS_IMPL(__VA_ARGS__, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+  NUM_ARGS_IMPL(__VA_ARGS__, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, \
+                7, 6, 5, 4, 3, 2, 1, 0)
+#endif
 
 #define COUNT_1(kind, ...) CAT(kind, __ONE)(__VA_ARGS__)
 #define COUNT_2(kind, ...) CAT(kind, __ARRAY)(__VA_ARGS__)

@@ -36,6 +36,19 @@ typedef RPCPTR_TYPE rpcptr_t;
  * Using the RPC Assembly language these ops can be composed at a higher level
  *
  * MEM_CAPACITY is the size of the data segment. It is defined by "rpcasm.h".
+ *
+ * Stack starts at MEM_CAPACITY and grows down
+ * Heap starts at 0 and grows up
+ *
+ * Like assembly code with global registers, operations on memunit typically
+ * use global registers in syntax
+ *
+ * RSP is Stack pointer register  == MEM->SP
+ * RHP is Heap pointer register   == MEM->HP
+ * RDATA is Data segment register == MEM->DATA
+ *
+ * It becomes more natural when writing PUSHDEF and POPDEF functions,
+ * explained below.
  **/
 typedef struct {
   rpcptr_t SP;             // stack pointer (grows down)
@@ -211,11 +224,11 @@ POPDEF(INT, int) {
 }
 
 PUSHDEF(FLOAT, float f) {
-  PUSH(INT, AS(int, f));
+  PUSH(INT, AS(unsigned, f));
 }
 
 POPDEF(FLOAT, float) {
-  int i;
+  unsigned i;
   POP(INT, i);
   return AS(float, i);
 }
