@@ -1,6 +1,7 @@
 #ifndef DEBUG_MACROS_H
 #define DEBUG_MACROS_H
 
+#define DEBUGFLOAT(x) fprintf(stderr, #x ": %f\n", x)
 #define DEBUGINT(x) fprintf(stderr, #x ": %d\n", x)
 #define DEBUGBOOL(x) fprintf(stderr, #x ": %s\n", x ? "true" : "false")
 #define DEBUGPTR(x) fprintf(stderr, #x ": 0x%04x\n", x)

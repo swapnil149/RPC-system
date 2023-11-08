@@ -7,6 +7,7 @@ int main() {
   int x = 4487, y = -4322;
   bool b = true;
   rpcptr_t ptr = 0xfffa;
+  float f = 8123.213f;
 
   int arr[] = {5, 7, 8, 2, 8, 123, 21};
   int triple_array[8][3][4] = {0};
@@ -29,6 +30,7 @@ int main() {
   DEBUGINT(RSP);
   PUSH(RPCPTR, ptr);
   DEBUGINT(RSP);
+  PUSH(FLOAT, f);
 
   SBRK(34);
 
@@ -44,6 +46,7 @@ int main() {
   ptr = -1;
   x = -1;
   y = -1;
+  f = -1000;
   memset(arr, -1, sizeof(arr));
   memset(triple_array, -1, sizeof(triple_array));
 
@@ -74,6 +77,8 @@ int main() {
   DEBUGINT(RSP);
   POP(BOOL, b);
   DEBUGINT(RSP);
+  POP(FLOAT, f);
+  DEBUGINT(RSP);
   POP(RPCPTR, ptr);
   DEBUGINT(RSP);
   POP(INT, y);
@@ -87,6 +92,7 @@ int main() {
   DEBUGINT(triple_array[6][2][2]);
   DEBUGINT(triple_array[0][0][0]);
 
+  DEBUGFLOAT(f);
   DEBUGBOOL(b);
   DEBUGPTR(ptr);
   DEBUGINT(x);

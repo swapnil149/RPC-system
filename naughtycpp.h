@@ -12,7 +12,8 @@
  * Also principle of least power, amirite? :D
  * */
 
-#define CAT(a, b) a##b
+#define CAT(a, b) _CAT_(a, b)
+#define _CAT_(a, b) a##b
 #define CAT3(a, b, c) _CAT3_HELPER(a, b, c)
 #define _CAT3_HELPER(a, b, c) a##b##c // concat is so annoying, double helper
 
@@ -49,24 +50,13 @@
                       _14, _15, _16, _17, _18, _19, _20, N, ...)               \
   N
 #endif
+
 #ifndef NUM_ARGS
 #define NUM_ARGS(...)                                                          \
   NUM_ARGS_IMPL(__VA_ARGS__, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, \
                 7, 6, 5, 4, 3, 2, 1, 0)
 #endif
 
-#define COUNT_1(kind, ...) CAT(kind, __ONE)(__VA_ARGS__)
-#define COUNT_2(kind, ...) CAT(kind, __ARRAY)(__VA_ARGS__)
-#define COUNT_3(...) COUNT_2(__VA_ARGS__)
-#define COUNT_4(...) COUNT_2(__VA_ARGS__)
-#define COUNT_5(...) COUNT_2(__VA_ARGS__)
-#define COUNT_6(...) COUNT_2(__VA_ARGS__)
-#define COUNT_7(...) COUNT_2(__VA_ARGS__)
-#define COUNT_8(...) COUNT_2(__VA_ARGS__)
-#define COUNT_9(...) COUNT_2(__VA_ARGS__)
-#define COUNT_10(...) COUNT_2(__VA_ARGS__)
-
-#define FIRST(a, ...) a
 #define SECOND(a, b, ...) b
 
 #define EMPTY()
@@ -86,7 +76,7 @@
 
 #define DEFER2(m) m EMPTY EMPTY()()
 
-#define IS_PROBE(...) SECOND(__VA_ARGS__, 0)
+#define IS_PROBE(...) CAAR(__VA_ARGS__, 0)
 #define PROBE() ~, 1
 
 #define NOT(x) IS_PROBE(CAT(_NOT_, x))
@@ -102,7 +92,7 @@
 
 #define _IF_0_ELSE(...) __VA_ARGS__
 
-#define HAS_ARGS(...) BOOL(FIRST(_END_OF_ARGUMENTS_ __VA_ARGS__)())
+#define HAS_ARGS(...) BOOL(CAR(_END_OF_ARGUMENTS_ __VA_ARGS__)())
 #define _END_OF_ARGUMENTS_() 0
 
 #define MAP(m, first, ...)                                                     \
@@ -113,12 +103,5 @@
 
 #define _STRINGIFY_(x) #x
 #define STRINGIFY(x) _STRINGIFY_(x)
-
-#define SUB_1 0
-
-// TODO — fix the max count issue
-#define IS_2_OR_MORE_ARGS(...)                                                 \
-  IS_NOT_ONE(NUM_ARGS(__VA_ARGS__), x, PUSH__ONE(U8, n))
-#define IS_NOT_ONE(x) IF_ELSE(CAT(SUB_, x))(PUSH__ARRAY(U8, n, 4))(f)
 
 #endif

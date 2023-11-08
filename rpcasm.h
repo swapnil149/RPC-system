@@ -76,7 +76,7 @@
 
 // clang-format on
 
-/* DEFINE A CUSTOM ROUTINE */
+/* DEFINE A CUSTOM ROUTINE (defers to a C function internally) */
 #define PUSHDEF(type, ...)                                                     \
   static inline void CAT(PUSH_, type)(__VA_ARGS__, rpcmem_t * MEM)
 
@@ -86,8 +86,18 @@
 /* CALLING ROUTINES */
 
 /* These eventually turn into PUSH__ONE or PUSH__ARRAY */
-#define PUSH(type, ...) _PUSH_(type, NUM_ARGS(__VA_ARGS__), __VA_ARGS__)
-#define POP(type, ...) _POP_(type, NUM_ARGS(__VA_ARGS__), __VA_ARGS__)
+#define PUSH(type, val, ...) _PUSH(type, val, __VA_ARGS__)
+#define POP(type, var, ...) _POP(type, var, __VA_ARGS__)
+
+#define IF_NOARGS(...) IF_ELSE(NOT(HAS_ARGS(__VA_ARGS__)))
+
+#define _PUSH(t, v, ...)                                                       \
+  IF_NOARGS(__VA_ARGS__)                                                       \
+  (PUSH__ONE(t, v))(PUSH__ARRAY(t, v, __VA_ARGS__))
+
+#define _POP(t, v, ...)                                                        \
+  IF_NOARGS(__VA_ARGS__)                                                       \
+  (POP__ONE(t, v))(POP__ARRAY(t, v, __VA_ARGS__))
 
 /* SINGLE CASE */
 #define PUSH__ONE(type, a) CAT(PUSH_, type)(a, MEM)
@@ -106,22 +116,20 @@
     PUSH__ONE(type, MULTIINDEX(a, i, __VA_ARGS__));                            \
   }
 
-#define SUM(a, ...) ((a)EVAL(MAP(_MULTLHS, __VA_ARGS__)))
-#define _MULTLHS(x) IF_ELSE(HAS_ARGS(x)) (*(x))()
+#define SUM(a, ...) ((a)EVAL(MAP(_MULT_LHS, __VA_ARGS__)))
+/* converts `x` to `* x` */
+#define _MULT_LHS(x) IF_ELSE(HAS_ARGS(x)) (*(x))()
 
-// for nd array `x` index with `x[0]...[0][i]` such that all indexes < n are 0
+/* `MULTIINDEX(x, i, 1, 2, 3, 4)` ==> `x[0][0][0][i]` */
 #define MULTIINDEX(x, i, ...) x _INDEXERS_(__VA_ARGS__)[i]
-#define ZEROINDEX(x) IF_ELSE(HAS_ARGS(x))([0])()
+/* `ZEROINDEX(x)` ==> `` */
+#define ZEROINDEX(x) IF_NOARGS(x)()([0])
 #define _INDEXERS_(_, ...) EVAL(MAP(ZEROINDEX, __VA_ARGS__))
 
 /* HELPFUL STUFF */
 
 /* reinterpret bits (not a cast) */
 #define AS(ctype, var) (*(ctype *)&var)
-
-// converts between PUSH__ARRAY and PUSH__ONE depending on argcount
-#define _PUSH_(type, count, ...) CAT(COUNT_, count)(PUSH, type, __VA_ARGS__)
-#define _POP_(type, count, ...) CAT(COUNT_, count)(POP, type, __VA_ARGS__)
 
 // clang-format on
 #endif

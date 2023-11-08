@@ -24,7 +24,6 @@
 #define MAX_IDL_FNAME_LEN 80
 #define MAX_PREFIX_LEN (MAX_IDL_FNAME_LEN + 40)
 
-
 typedef RPCPTR_TYPE rpcptr_t;
 
 /*
@@ -51,9 +50,9 @@ typedef RPCPTR_TYPE rpcptr_t;
  * explained below.
  **/
 typedef struct {
-  rpcptr_t SP;             // stack pointer (grows down)
-  rpcptr_t HP;             // heap pointer  (grows up)
-  char *DATA; // data segment 
+  rpcptr_t SP; // stack pointer (grows down)
+  rpcptr_t HP; // heap pointer  (grows up)
+  char *DATA;  // data segment 
 } rpcmem_t;
 
 static rpcmem_t *rpcmem_new() {
@@ -185,7 +184,7 @@ static void rpcmem_frombuf(const char *inbuf, int len, rpcmem_t *MEM,
  * Initial RPC Assembly Language Basis
  */
 
-PUSHDEF(BOOL, bool b) { 
+PUSHDEF(BOOL, bool b) {
   PUSH(U8, (char)b);
 }
 
