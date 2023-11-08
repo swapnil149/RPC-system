@@ -4,14 +4,15 @@
 // clang-format off
 
 // variable size based on addr_bits
-#include <stdio.h>
 #define RPCADDR_BITS 16
+
+#define MAX_IDL_FNAME_LEN 80
 
 #include "rpcasm.h"
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef RPCPTR_INTERNAL_TYPE rpcptr_t;
+typedef RPCPTR_TYPE rpcptr_t;
 
 /*
  * RPC VIRTUAL MEMORY UNIT
@@ -34,7 +35,8 @@ void rpcmem_free(rpcmem_t **mem_pp);
 int rpcmem_tobuf(const char *fname, const rpcmem_t *MEM, void **outbuf);
 
 // returns function name
-char *rpcmem_frombuf(const void *inbuf, int len, rpcmem_t *MEM);
+void rpcmem_frombuf(const void *inbuf, rpcmem_t *MEM,
+                    char fname[MAX_IDL_FNAME_LEN]);
 
 /*
  * RPC Assembly Embedded Language, implemented with C preprocessor
@@ -110,8 +112,6 @@ char *rpcmem_frombuf(const void *inbuf, int len, rpcmem_t *MEM);
 /*
  * Initial RPC Assembly Language Basis
  */
-
-#include <stdio.h>
 
 PUSHDEF(INT, int x) {
   for (int i = sizeof(x) - 1; i >= 0; i--) 
