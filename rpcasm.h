@@ -1,12 +1,12 @@
 #ifndef RPCASM_H
 #define RPCASM_H
 
-// Hiding the ugly...
+// Hiding the sort of ugly...
 //
 // Recommended reading:
 // http://jhnet.co.uk/articles/cpp_magic
 //
-#include "cpphacking.h"
+// See cpphacking.h for more
 
 /*
  * Implementation of the embedded RPC ASM language

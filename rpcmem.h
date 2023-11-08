@@ -1,22 +1,29 @@
 #ifndef RPCMEM_H
 #define RPCMEM_H
 
-#include "debugmacros.h"
+// #define NOLIB
+
+#ifndef NOLIB
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#endif
+
+#include "debugmacros.h"
+#include "naughtycpp.h"
 
 // clang-format off
 
 // variable size based on addr_bits
 #define RPCADDR_BITS 16
 
+#include "rpcasm.h"
+
 #define MAX_IDL_FNAME_LEN 80
 #define MAX_PREFIX_LEN (MAX_IDL_FNAME_LEN + 40)
 
-#include "rpcasm.h"
 
 typedef RPCPTR_TYPE rpcptr_t;
 
@@ -31,55 +38,52 @@ typedef RPCPTR_TYPE rpcptr_t;
  * MEM_CAPACITY is the size of the data segment. It is defined by "rpcasm.h".
  **/
 typedef struct {
-  rpcptr_t SP;             // stack pointer
-  rpcptr_t HP;             // heap pointer
-  char DATA[MEM_CAPACITY]; // data segment 
+  rpcptr_t SP;             // stack pointer (grows down)
+  rpcptr_t HP;             // heap pointer  (grows up)
+  char *DATA; // data segment 
 } rpcmem_t;
 
-// pre-allocate VM buffers
-static char     global_transmit_buffer[MEM_CAPACITY + MAX_PREFIX_LEN] = {0};
-static rpcmem_t global_rpc_memory_unit = {
-  .SP = (rpcptr_t)MEM_CAPACITY - 1,
-  .HP = 0,
-  .DATA = {0},
-};
-static rpcmem_t *MEM = &global_rpc_memory_unit;
+static rpcmem_t *rpcmem_new() {
+  rpcmem_t *MEM = (rpcmem_t*) malloc(sizeof(*MEM));
+  RSP = MEM_CAPACITY - 1;
+  RHP = 0;
+  RDATA = (char*)malloc(MEM_CAPACITY);
+  memset(RDATA, 0, MEM_CAPACITY);
+  return MEM;
+}
 
-// clang-format on
+static void rpcmem_free(rpcmem_t **mem_pp) {
+  rpcmem_t *MEM = *mem_pp;
+  free(RDATA);
+  free(MEM);
+  *mem_pp = NULL;
+}
+
+#define PREFIX_FMT "%s %08x"
 
 // returns total length of buffer
-static int rpcmem_tobuf(const char *fname, const rpcmem_t *MEM, char *outbuf) {
-  // special format string to prevent buffer overflow attack
-  // in the compressed buffer, stack starts at RHP
-  int prefixlen = snprintf(outbuf, MAX_PREFIX_LEN,
-                           "%" STRINGIFY(MAX_IDL_FNAME_LEN) "s %04x", fname, 0);
-  assert(prefixlen < MAX_PREFIX_LEN);
-
-  memcpy(outbuf + prefixlen, RDATA, RHP);
-  memcpy(outbuf + prefixlen + RHP, RDATA + RSP, MEM_CAPACITY - RSP);
-
-  int newprefixlen = snprintf(outbuf, MAX_PREFIX_LEN,
-                              "%" STRINGIFY(MAX_IDL_FNAME_LEN) "s %04x", fname,
-                              RHP + prefixlen);
-  assert(prefixlen == newprefixlen);
-
-  return prefixlen + RSP + (MEM_CAPACITY - RHP);
+static int rpcmem_tobuf(const char *fname, const rpcmem_t *MEM, char **outbuf) {
+  // calculate prefix length (contains fname and RSP value)
+  int prefixlen = snprintf(NULL, 0, PREFIX_FMT, fname, RHP);
+  assert(prefixlen < MAX_PREFIX_LEN && prefixlen);
+  *outbuf = (char *)malloc(prefixlen + RHP + (MEM_CAPACITY - RSP));
+  snprintf(*outbuf, MAX_PREFIX_LEN, PREFIX_FMT, fname, RHP);
+  memcpy(*outbuf + prefixlen, RDATA, RHP);
+  memcpy(*outbuf + prefixlen + RHP, RDATA + RSP, MEM_CAPACITY - RSP);
+  return prefixlen + RHP + (MEM_CAPACITY - RSP);
 }
 
 // returns function name
 static void rpcmem_frombuf(const char *inbuf, int len, rpcmem_t *MEM,
                            char fname[MAX_IDL_FNAME_LEN]) {
   int stackptr, prefixlen;
-
-  // special format string to prevent buffer overflow attack
-  sscanf(inbuf, "%" STRINGIFY(MAX_IDL_FNAME_LEN) "s %04x%n", fname, &stackptr,
-         &prefixlen);
+  sscanf(inbuf, PREFIX_FMT "%n", fname, &stackptr, &prefixlen);
   RSP = stackptr;
-  memcpy(RDATA, inbuf + prefixlen, RSP);
-  memcpy(RDATA + RHP, inbuf + prefixlen + RSP, MEM_CAPACITY - RHP);
+  RHP = 0;
+  memcpy(RDATA, inbuf + prefixlen, len);
 }
 
-// clang-format off
+#undef PREFIX_FMT
 
 /*
  * RPC Assembly Embedded Language, implemented with C preprocessor
@@ -96,9 +100,9 @@ static void rpcmem_frombuf(const char *inbuf, int len, rpcmem_t *MEM,
  * ----------------------------------------------
  * PUSHU8  | byte          |         | add to stack
  * POPU8   |               | byte    | pop off stack
- * SBRK    | size          | rpcptr  | alloc on heap
- * STORE   | rpcptr, byte  |         | place on heap
- * LOAD    | rpcptr        | byte    | fetch from heap
+ * SBRK    | size          | rpcptr  | alloc `size` bytes on heap
+ * STORE   | rpcptr, byte  |         | place byte on heap
+ * LOAD    | rpcptr        | byte    | fetch byte from heap
  *
  * The basic PUSH and POP are defined on the rpc type U8. 
  * Syntatically, `PUSH(U8, <val>)` and `POP(U8, <var>)`. See function calls 
@@ -106,7 +110,7 @@ static void rpcmem_frombuf(const char *inbuf, int len, rpcmem_t *MEM,
  *
  * Function Definitions
  * --------------------
- *   Users can define custom function as well.
+ *   Users can define custom functions as well.
  *
  *   Functions can either pop off the memory unit or push onto
  *   the memory unit. This is distinguished by a POP or PUSH call.
@@ -129,24 +133,36 @@ static void rpcmem_frombuf(const char *inbuf, int len, rpcmem_t *MEM,
  *
  * To call use, make sure the c type of the <c_exp> matches the parameters
  * defined before.
- * PUSH(<type>, <c_exp>, ..., <c_exp>);
+ * PUSH(<type>, <c_exp>);
  *
- * To pop, provide a c variable to pop into, such that the c type of <c_id>
- * matches they type when the POPDEF was declared.
+ * e.g.
+ * int c = 8;
+ * PUSH(INT, c); // OR 
+ * PUSH(INT, 8);
+ *
+ * To pop, provide a c variable to pop into. The c type of <c_id>
+ * matches the type given when the POPDEF was declared.
  *
  * POP(<type>, <c_id>);
+ *
+ * e.g.
+ * int c;
+ * POP(INT, c);
  *
  * Or to immediately return the popped value,
  *
  * POP(<type>, return);
  *
- * To do it with arrays
+ * e.g.
+ * POP(INT, return);
  *
- * For example
- * int x[80][2][9];
- * int y[80][2][9];
+ * To push and pop contiguous arrays add the dimensions after the values
  *
- * PUSH(INT, x, 80, 2, 9);
+ * For example (in C-like pseudocode):
+ * int x[80][2][9] = {0};
+ * int y[80][2][9] = {-1};
+ *
+ * PUSH(INT, x, 80, 2, 9); // real RPC asm
  * POP(INT, y, 80, 2, 9);
  *
  * assert(x[] == y[])
@@ -156,27 +172,42 @@ static void rpcmem_frombuf(const char *inbuf, int len, rpcmem_t *MEM,
  * Initial RPC Assembly Language Basis
  */
 
-PUSHDEF(INT, int x) {
-  for (int i = sizeof(x) - 1; i >= 0; i--) 
-    PUSH(U8, (unsigned char)(x >> (8 * i)));
-}
-
-POPDEF(INT, int) {
-  unsigned char c;
-  int x = 0;
-  for (int i = 0; i < sizeof(x); i++) {
-    POP(U8, c);
-    x |= c << (8 * i);
-  }
-  return x;
-}
-
 PUSHDEF(BOOL, bool b) { 
   PUSH(U8, (char)b);
 }
 
 POPDEF(BOOL, bool) {
   POP(U8, return);
+}
+
+PUSHDEF(RPCPTR, rpcptr_t p) {
+  unsigned char cs[] = {
+    (unsigned char)p,
+    (unsigned char)(p >> 8),
+  };
+  PUSH(U8, cs, 2);
+}
+
+POPDEF(RPCPTR, rpcptr_t) {
+  unsigned char cs[2];
+  POP(U8, cs, 2);
+  return cs[0] | cs[1] << 8;
+}
+
+PUSHDEF(INT, int x) {
+  unsigned char cs[] = {
+    (unsigned char)x,
+    (unsigned char)(x >> 8),
+    (unsigned char)(x >> 16),
+    (unsigned char)(x >> 24),
+  };
+  PUSH(U8, cs, 4);
+}
+
+POPDEF(INT, int) {
+  unsigned char cs[4];
+  POP(U8, cs, 4);
+  return cs[0] | cs[1] << 8 | cs[2] << 16 | cs[3] << 24;
 }
 
 PUSHDEF(FLOAT, float f) {
@@ -187,21 +218,6 @@ POPDEF(FLOAT, float) {
   int i;
   POP(INT, i);
   return AS(float, i);
-}
-
-PUSHDEF(RPCPTR, rpcptr_t p) {
-  for (int i = sizeof(p) - 1; i >= 0; i--)
-    PUSH(U8, (unsigned char)(p >> (8 * i)));
-}
-
-POPDEF(RPCPTR, rpcptr_t) {
-  unsigned char c;
-  rpcptr_t p = 0;
-  for (int i = 0; i < sizeof(p); i++) {
-    POP(U8, c);
-    p |= c << (8 * i);
-  }
-  return p;
 }
 
 // clang-format on

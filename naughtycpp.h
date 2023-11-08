@@ -1,11 +1,17 @@
 #ifndef CPP_HACKING_H
 #define CPP_HACKING_H
 
-/* EVIL CPP HACKING */
+/* NAUGHTY CPP HACKING
+ *
+ * Things get pretty ugly in here — but they work.
+ * Our best excuse is that you don't get mad at gcc for it's internal spagetti.
+ *
+ * Also principle of least power, amirite? :D
+ * */
 
 #define CAT(a, b) a##b
 #define CAT3(a, b, c) _CAT3_HELPER(a, b, c)
-#define _CAT3_HELPER(a, b, c) a##b##c // annoying concat operator
+#define _CAT3_HELPER(a, b, c) a##b##c // concat is so annoying, double helper
 
 #define CAR(a, ...) a
 #define CDR(_, ...) __VA_ARGS__
@@ -45,6 +51,7 @@
 #define COUNT_5(...) COUNT_2(__VA_ARGS__)
 #define COUNT_6(...) COUNT_2(__VA_ARGS__)
 #define COUNT_7(...) COUNT_2(__VA_ARGS__)
+#define COUNT_8(...) COUNT_2(__VA_ARGS__)
 #define COUNT_9(...) COUNT_2(__VA_ARGS__)
 #define COUNT_10(...) COUNT_2(__VA_ARGS__)
 
@@ -93,9 +100,14 @@
   )
 #define _MAP() MAP
 
-#define GREET(...) IF_ELSE(HAS_ARGS(__VA_ARGS__))(Hello, __VA_ARGS__ !)()
-
 #define _STRINGIFY_(x) #x
 #define STRINGIFY(x) _STRINGIFY_(x)
+
+#define SUB_1 0
+
+// TODO — fix the max count issue
+#define IS_2_OR_MORE_ARGS(...)                                                 \
+  IS_NOT_ONE(NUM_ARGS(__VA_ARGS__), x, PUSH__ONE(U8, n))
+#define IS_NOT_ONE(x) IF_ELSE(CAT(SUB_, x))(PUSH__ARRAY(U8, n, 4))(f)
 
 #endif
