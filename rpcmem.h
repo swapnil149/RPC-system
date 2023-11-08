@@ -2,7 +2,11 @@
 #define RPCMEM_H
 
 #include "debugmacros.h"
+#include <assert.h>
+#include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 // clang-format off
 
@@ -32,50 +36,50 @@ typedef struct {
   char DATA[MEM_CAPACITY]; // data segment 
 } rpcmem_t;
 
-// pre-allocate all memory
+// pre-allocate VM buffers
 static char     global_transmit_buffer[MEM_CAPACITY + MAX_PREFIX_LEN] = {0};
 static rpcmem_t global_rpc_memory_unit = {
-  .SP = 0,
-  .HP = (rpcptr_t)MEM_CAPACITY,
+  .SP = (rpcptr_t)MEM_CAPACITY - 1,
+  .HP = 0,
   .DATA = {0},
 };
 static rpcmem_t *MEM = &global_rpc_memory_unit;
 
-static void cpymem(void *dst, const void *src, unsigned long n) {
-  for (int i = 0; i < n; i++)
-    ((char*)dst)[i] = ((char*)src)[i];
-}
+// clang-format on
 
 // returns total length of buffer
 static int rpcmem_tobuf(const char *fname, const rpcmem_t *MEM, char *outbuf) {
   // special format string to prevent buffer overflow attack
-  char prefix[MAX_PREFIX_LEN];
-  int prefixlen = snprintf(prefix, MAX_PREFIX_LEN, "%" STRINGIFY(MAX_IDL_FNAME_LEN) "s %d %d",
-                          fname, RSP, RHP);
-  ASSERT(prefixlen < MAX_PREFIX_LEN);
+  // in the compressed buffer, stack starts at RHP
+  int prefixlen = snprintf(outbuf, MAX_PREFIX_LEN,
+                           "%" STRINGIFY(MAX_IDL_FNAME_LEN) "s %04x", fname, 0);
+  assert(prefixlen < MAX_PREFIX_LEN);
 
-  cpymem(outbuf                  , prefix     , prefixlen);
-  cpymem(outbuf + prefixlen      , RDATA      , RSP);
-  cpymem(outbuf + prefixlen + RSP, RDATA + RHP, MEM_CAPACITY - RHP);
+  memcpy(outbuf + prefixlen, RDATA, RHP);
+  memcpy(outbuf + prefixlen + RHP, RDATA + RSP, MEM_CAPACITY - RSP);
+
+  int newprefixlen = snprintf(outbuf, MAX_PREFIX_LEN,
+                              "%" STRINGIFY(MAX_IDL_FNAME_LEN) "s %04x", fname,
+                              RHP + prefixlen);
+  assert(prefixlen == newprefixlen);
+
   return prefixlen + RSP + (MEM_CAPACITY - RHP);
 }
 
-#undef MAX_PREFIX_LEN
-
 // returns function name
-static void rpcmem_frombuf(const char *inbuf, rpcmem_t *MEM,
-                    char fname[MAX_IDL_FNAME_LEN]) {
-  int stackptr, heapptr, prefixlen;
+static void rpcmem_frombuf(const char *inbuf, int len, rpcmem_t *MEM,
+                           char fname[MAX_IDL_FNAME_LEN]) {
+  int stackptr, prefixlen;
 
   // special format string to prevent buffer overflow attack
-  sscanf(inbuf, "%" STRINGIFY(MAX_IDL_FNAME_LEN) "s %d %d%n", fname, &stackptr,
-         &heapptr, &prefixlen);
+  sscanf(inbuf, "%" STRINGIFY(MAX_IDL_FNAME_LEN) "s %04x%n", fname, &stackptr,
+         &prefixlen);
   RSP = stackptr;
-  RHP = heapptr;
-  cpymem(RDATA      , inbuf + prefixlen      , RSP);
-  cpymem(RDATA + RHP, inbuf + prefixlen + RSP, MEM_CAPACITY - RHP);
+  memcpy(RDATA, inbuf + prefixlen, RSP);
+  memcpy(RDATA + RHP, inbuf + prefixlen + RSP, MEM_CAPACITY - RHP);
 }
 
+// clang-format off
 
 /*
  * RPC Assembly Embedded Language, implemented with C preprocessor

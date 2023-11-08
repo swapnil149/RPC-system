@@ -33,9 +33,9 @@
 /* Stuff dependent on bit address size */
 
 #if RPCADDR_BITS > 16
-#define MEM_CAPACITY ((1U << 20) - 1) // 1mb
+#define MEM_CAPACITY (1U << 20) // 1mb
 #else
-#define MEM_CAPACITY ((1U << RPCADDR_BITS) - 1) // 64kb
+#define MEM_CAPACITY (1U << RPCADDR_BITS) // 64kb
 #endif
 
 #if RPCADDR_BITS == 64
@@ -43,7 +43,7 @@
 #elif RPCADDR_BITS == 32
 #define RPCPTR_TYPE unsigned int
 #elif RPCADDR_BITS == 16
-#define RPCPTR_TYPE short
+#define RPCPTR_TYPE unsigned short
 #endif
 
 // clang-format off
@@ -54,20 +54,22 @@
 #define RDATA     MEM->DATA
 
 /* STACK ISA */
-#define PUSH_U8(byte, ...) RDATA[RSP++] = (char)(byte)
-#define POP_U8(...)        RDATA[--RSP]
+#define PUSH_U8(byte, ...) RDATA[RSP--] = (char)(byte)
+#define POP_U8(...)        RDATA[++RSP]
 
 /* HEAP ISA */
-#define SBRK(n)                 (RHP = RHP - (n), RHP)
+#define SBRK(n)                 (RHP = RHP + (n), RHP - (n))
 #define STORE(byte, rpc_addr)   RDATA[(rpc_addr)] = (byte)
 #define LOAD(rpc_addr, cpp_var) (cpp_var) = RDATA[(rpc_addr)]
 
-/* DEFINE A CUSTOM ROUTINE */ 
-#define PUSHDEF(type, ...)  \
-  static inline void CAT(PUSH_,type)(__VA_ARGS__, rpcmem_t *MEM)
+// clang-format on
 
-#define POPDEF(type, rtcty) \
-  static inline rtcty CAT(POP_,type)(rpcmem_t *MEM)
+/* DEFINE A CUSTOM ROUTINE */
+#define PUSHDEF(type, ...)                                                     \
+  static inline void CAT(PUSH_, type)(__VA_ARGS__, rpcmem_t * MEM)
+
+#define POPDEF(type, returntype)                                               \
+  static inline returntype CAT(POP_, type)(rpcmem_t * MEM)
 
 /* CALLING ROUTINES */
 
@@ -77,24 +79,23 @@
 
 /* SINGLE CASE */
 #define PUSH__ONE(type, a) CAT(PUSH_, type)(a, MEM)
-#define POP__ONE(type, a)          \
-  IF_RETURN(a)                     \
-    (return CAT(POP_, type) (MEM)) \
-     (a = CAT(POP_, type) (MEM))
+#define POP__ONE(type, a)                                                      \
+  IF_RETURN(a)                                                                 \
+  (return CAT(POP_, type)(MEM))(a = CAT(POP_, type)(MEM))
 
 /* ARRAY CASE */
-#define POP__ARRAY(type, a, ...)                       \
-  for (int i = SUM(__VA_ARGS__); i > 0; i--) {         \
-    POP__ONE(type, MULTIINDEX(a, i - 1, __VA_ARGS__)); \
-  } 
-
-#define PUSH__ARRAY(type, a, ...)                   \
-  for (int i = 0; i < SUM(__VA_ARGS__); i++) {      \
-    PUSH__ONE(type, MULTIINDEX(a, i, __VA_ARGS__)); \
+#define POP__ARRAY(type, a, ...)                                               \
+  for (int i = SUM(__VA_ARGS__) - 1; i >= 0; i--) {                            \
+    POP__ONE(type, MULTIINDEX(a, i, __VA_ARGS__));                             \
   }
 
-#define SUM(a, ...) ((a) EVAL(MAP(_MULTLHS, __VA_ARGS__)))
-#define _MULTLHS(x) IF_ELSE(HAS_ARGS(x))(* (x))()
+#define PUSH__ARRAY(type, a, ...)                                              \
+  for (int i = 0; i < SUM(__VA_ARGS__); i++) {                                 \
+    PUSH__ONE(type, MULTIINDEX(a, i, __VA_ARGS__));                            \
+  }
+
+#define SUM(a, ...) ((a)EVAL(MAP(_MULTLHS, __VA_ARGS__)))
+#define _MULTLHS(x) IF_ELSE(HAS_ARGS(x)) (*(x))()
 
 // for nd array `x` index with `x[0]...[0][i]` such that all indexes < n are 0
 #define MULTIINDEX(x, i, ...) x _INDEXERS_(__VA_ARGS__)[i]
@@ -104,7 +105,7 @@
 /* HELPFUL STUFF */
 
 /* reinterpret bits (not a cast) */
-#define AS(ctype, var) (*(ctype*)&var)
+#define AS(ctype, var) (*(ctype *)&var)
 
 // converts between PUSH__ARRAY and PUSH__ONE depending on argcount
 #define _PUSH_(type, count, ...) CAT(COUNT_, count)(PUSH, type, __VA_ARGS__)
