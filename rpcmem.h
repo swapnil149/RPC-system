@@ -71,6 +71,11 @@ static void rpcmem_free(rpcmem_t **mem_pp) {
   *mem_pp = NULL;
 }
 
+// TODO: decide if we want it and implement
+static void rpcmem_expand(rpcmem_t *MEM) {
+  (void)MEM;
+}
+
 #define PREFIX_FMT "%s %08x"
 
 // returns total length of buffer
@@ -94,6 +99,7 @@ static void rpcmem_frombuf(const char *inbuf, int len, rpcmem_t *MEM,
   RHP = 0;
   memcpy(RDATA, inbuf + prefixlen, len);
 }
+
 
 #undef PREFIX_FMT
 

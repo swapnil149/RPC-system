@@ -9,13 +9,14 @@
  * Recommended reading:
  * http://jhnet.co.uk/articles/cpp_magic
  *
- * Also principle of least power, amirite? :D
+ * Also principle of least power, amirite hehe? :D
  * */
 
 #define CAT(a, b) _CAT_(a, b)
 #define _CAT_(a, b) a##b
-#define CAT3(a, b, c) _CAT3_HELPER(a, b, c)
-#define _CAT3_HELPER(a, b, c) a##b##c // concat is so annoying, double helper
+
+#define _STRINGIFY_(x) #x
+#define STRINGIFY(x) _STRINGIFY_(x)
 
 #define CAR(a, ...) a
 #define CDR(_, ...) __VA_ARGS__
@@ -56,8 +57,6 @@
   NUM_ARGS_IMPL(__VA_ARGS__, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, \
                 7, 6, 5, 4, 3, 2, 1, 0)
 #endif
-
-#define SECOND(a, b, ...) b
 
 #define EMPTY()
 
@@ -100,8 +99,5 @@
       DEFER2(_MAP)()(m, __VA_ARGS__))(/* Do nothing, just terminate */         \
   )
 #define _MAP() MAP
-
-#define _STRINGIFY_(x) #x
-#define STRINGIFY(x) _STRINGIFY_(x)
 
 #endif
