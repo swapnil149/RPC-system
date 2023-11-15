@@ -8,14 +8,19 @@
 
 #define INITIAL_CAPACITY (1 << 16)
 
+//                 "<fname> <stackptr>"
+#define PREFIX_FMT "%s %08x"
+
+#define MAX_FNAME_LEN 80
+#define MAX_PREFIX_LEN (MAX_FNAME_LEN + 20) // rough estimate
+
 typedef uint32_t rpcptr_t;
 
 struct rpcmem_t {
   unsigned char *data;
   rpcptr_t hp;
   rpcptr_t sp;
-  // internal only
-  rpcptr_t capacity;
+  rpcptr_t capacity; // internal use only
 };
 
 static rpcmem_t *rpcmem_new() {
@@ -40,10 +45,6 @@ static void rpcmem_expand(rpcmem_t *m) {
   m->data = (unsigned char*)realloc(m->data, m->capacity);
   memcpy(m->data + m->capacity - stacksize, m->data + m->sp, stacksize);
 }
-
-#define MAX_FNAME_LEN 80
-#define MAX_PREFIX_LEN (MAX_FNAME_LEN + 40)
-#define PREFIX_FMT "%s %08x"
 
 static int rpcmem_tobuf(const char *fname, const rpcmem_t *m, char **outbuf) {
   int prefixlen = snprintf(NULL, 0, PREFIX_FMT, fname, m->hp);
