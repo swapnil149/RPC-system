@@ -1,1 +1,272 @@
 #!/usr/bin/env python3
+import sys
+
+
+def read_idl_to_json(idl_filename: str) -> dict:
+    """
+    Given an idl filename, convert the IDL to a JSON object, and return it
+    """
+    pass
+
+
+def gen_proxy_boilerplate() -> str:
+    pass
+
+
+def gen_stub_boilerplate() -> str:
+    pass
+
+
+def get_idl_struct_definitions(idl_json: dict) -> dict:
+    """
+    In returned dict, each value always contains AT MOST one struct definition.
+    dict output from below function
+    {
+        'Person': {'age': 'int', 'hobbies': 'string[4]'},
+        'People': {'people': 'Person[4]'}
+    }
+    """
+    return {}
+
+
+def get_idl_function_declarations(idl_json: dict) -> dict:
+    return {}
+
+
+def gen_basis_types_packers() -> str:
+    return {}
+
+
+def gen_basis_types_unpackers() -> str:
+    return {}
+
+
+# IDL:
+"""
+struct Person {
+    int age;
+    string hobbies[4];
+};
+
+struct People {
+    Person people[4];
+};
+
+Person get_nth_person(People people, int n, int somenums[3][4]);
+Person get_first_person2(Person people[4]);
+"""
+
+# PROXY example (caller):
+"""
+void pack_Person(Person person, rpcmem_t *MEM) {
+    pack_int(person.age, MEM);
+    for (int __i = 0; __i < 4; __i++) {
+        pack_string(person.hobbies[__i], MEM);
+    }
+}
+
+Person unpack_Person(rpcmem_t *MEM) {
+    Person result;
+    for (int __i = (4) - 1; __i >= 0; __i--) {
+        result.hobbies[__i] = unpack_string(MEM);
+    }
+    result.age = unpack_int(MEM);
+    return result
+}
+
+void pack_People(People people, rpcmem_t *MEM) {
+    for (int __i = 0; __i < 4; __i++) {
+        Pack_Person(people.people[__i], MEM);
+    }
+}
+
+People unpack_People(rpcmem_t *MEM) {
+    People result;
+    for (int __i = (4) - 1; __i > 0; __i++) {
+        result.person[__i - 1] = unpack_Person(MEM);
+    }
+    return result;
+}
+
+Person get_first_person2(Person people[4]) {
+    // boilerplate declare result and mem
+
+    for (int i = 0; i < 4; i++) {
+        Pack_Person(people.people[__i], MEM);
+    }
+
+    // boilerplate send and receive mem
+
+    for (int i = 0; i < 4; i++) {
+        Pack_Person(people.people[__i], MEM);
+    }
+
+}
+
+Person get_nth_person(People people, int n, int somenums[3][4]) {
+    // every non void function has a return value named result
+    Person result;
+    rpcmem_t *MEM = rpcmem_new();
+
+    pack_People(people, MEM);
+    pack_int(n, MEM);
+    for (int __i = 0; __i < 3 * 4; __i++) {
+        pack_int(somenums[0][__i], MEM);
+    }
+
+    rpccall("get_nth_person", MEM);
+    rpcreceive(MEM);
+
+    result = unpack_Person(MEM);
+
+    return result;
+}
+
+"""
+
+
+def gen_packing_code(var, struct_def, packers):
+    """
+    Assumes an `rpcmem_t *MEM` is in scope.
+    Generates the C++ statements to pack the type.
+    """
+    pass
+
+
+def gen_unpacking_code(var, struct_def, unpackers):
+    """
+    Assumes an `rpcmem_t *MEM`, and `<type> result` is in scope.
+    Generates the C++ statements to unpack the type.
+    """
+    pass
+
+
+def gen_struct_packer(struct_name: str, struct_def: dict, packers: dict) -> str:
+    if not struct_name in packers:
+        raise Exception(f"Struct {struct_name} not previously declared")
+    struct_var = "packee"
+    packer_def = f"""
+    void pack_{struct_name}({struct_name} {struct_var}, rpcmem_t *MEM) {{
+        {gen_packing_code(struct_var, struct_def, packers)}
+    }}
+    """
+    pass
+
+
+def gen_struct_unpacker(struct_name: str, struct_def: dict, unpackers: dict) -> str:
+    if not struct_name in unpackers:
+        raise Exception(f"Struct {struct_name} not previously declared")
+
+    unpacker_code = f"""
+    {struct_name} unpack_{struct_name}(rpcmem_t *MEM) {{
+        {struct_name} result;
+        {gen_unpacking_code("result", struct_def, unpackers[struct_name])}
+        return result;
+    }}
+    """
+    return unpacker_code
+
+
+def stringify_arguments(arguments):
+    return ""
+
+
+def gen_proxy_def(func_decl: dict, packers: dict, unpackers: dict) -> str:
+    function_name = func_decl[function_name]
+    arguments = func_decl[arguments]
+    return_type = func_decl[return_type]
+
+    arguments_string = stringify_arguments(arguments)
+
+    declare_result = f"{return_type} result;" if return_type != "void" else ""
+    return_result = f"return result;" if return_type != "void" else ""
+
+    f"""
+    {return_type} {function_name}({arguments_string}) {{
+        {declare_result}
+        rpcmem_t *MEM = rpcmem_new();
+        {gen_packing_code(arguments)}
+        rpc_send(\"{function_name}\", MEM);
+        rpc_receive(MEM);
+        {gen_unpacking_code(return_type, unpackers)}
+        rpcmem_free(&MEM);
+        {return_result}
+    }}
+    """
+    pass
+
+
+def gen_stub_def(func_decl: dict, packers: dict, unpackers: dic) -> str:
+    function_name = func_decl["function_name"]
+    arguments = func_decl["arguments"]
+    return_type = func_decl["return_type"]
+
+    arguments_string = stringify_arguments(arguments)
+    return f"""
+    {return_type} {function_name}({arguments_string}, rpcmem_t *MEM) {{
+        rpcmem_t *MEM = rpcmem_new();
+        {gen_unpacking_code()}
+        {function_name}({arguments});
+        {gen_packing_code()}
+    }}
+    """
+    pass
+
+
+def gen_stub_dispatcher(func_decls: list[dict]) -> str:
+    pass
+
+
+def write_proxy(proxy_code: str, idl_filename: str):
+    with open(f"{idl_filename.removesuffix('.idl')}.proxy.cpp", 'w') as f:
+        f.write(proxy_code)
+
+
+def write_stub(stub_code: str, idl_filename: str):
+    with open(f"{idl_filename.removesuffix('.idl')}.stub.cpp", 'w') as f:
+        f.write(stub_code)
+
+
+def extract_function_defs(packers: dict) -> list[str]:
+    return []
+
+
+if __name__ == '__main__':
+    idl_filename = sys.argv[1]
+    idl_json = read_idl_to_json(idl_filename)
+    idl_include = f"#include \"{idl_filename}\""
+
+    proxy_boilerplate = gen_proxy_boilerplate()
+    stub_boilerplate = gen_stub_boilerplate()
+
+    struct_defs = get_idl_struct_definitions(idl_json)
+    # {
+    #     'Person': {'age': 'int', 'hobbies': 'string[4]'},
+    #     'People': {'people': 'Person[4]'}
+    # }
+    func_decls = get_idl_function_declarations(idl_json)
+
+    # TBD what these actually contain
+    packers: dict = gen_basis_types_packers()
+    unpackers: dict = gen_basis_types_unpackers()
+    for name, struct_def in struct_defs:
+        packers[name] = gen_struct_packer(name, struct_def, packers)
+        unpackers[name] = gen_struct_unpacker(name, struct_def, unpackers)
+
+    proxy_funcs = [gen_proxy_def(f, packers, unpackers) for f in func_decls]
+    stub_funcs = [gen_stub_def(f, packers, unpackers) for f in func_decls]
+
+    stub_dispatcher = gen_stub_dispatcher(func_decls)
+
+    packer_defs = extract_function_defs(packers)
+    unpacker_defs = extract_function_defs(unpackers)
+
+    proxy_code = '\n'.join(
+        [idl_include, proxy_boilerplate, packer_defs, unpacker_defs, proxy_funcs].flatten())
+    stub_code = '\n'.join(
+        [idl_include, stub_boilerplate, packer_defs, unpacker_defs, stub_funcs, stub_dispatcher].flatten())
+
+    write_proxy(proxy_code, idl_filename)
+    write_stub(stub_code, idl_filename)
+
+    print(idl_filename)

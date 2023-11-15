@@ -1,0 +1,15 @@
+struct Person {
+  string name;
+  int age;
+  int lucky_numbers[5];
+};
+
+struct People {
+  Person people[4];
+  string nicknames[4];
+};
+
+Person nth_person(People ppl, int n);
+string nth_nickname(People ppl, int n);
+float lucky_avg(Person p);
+float avg_4D(int nums[8][8][8][8]);
