@@ -10,7 +10,7 @@ using namespace std;
 // PACK
 //
 
-static void pack_int(int x, rpcmem_t *m) {
+static void pack_int(unsigned x, rpcmem_t *m) {
   unsigned char bytes[4] = {
       (unsigned char)x,
       (unsigned char)(x >> 8),

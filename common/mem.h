@@ -8,7 +8,7 @@
 
 #define INITIAL_CAPACITY (1 << 16)
 
-//                 "<fname> <stackptr>"
+//                 "<fname> <stackptr & heapptr>"
 #define PREFIX_FMT "%s %08x"
 
 #define MAX_FNAME_LEN 80
@@ -18,8 +18,8 @@ typedef uint32_t rpcptr_t;
 
 struct rpcmem_t {
   unsigned char *data;
-  rpcptr_t hp;
-  rpcptr_t sp;
+  rpcptr_t hp;       // heap ptr
+  rpcptr_t sp;       // stack ptr
   rpcptr_t capacity; // internal use only
 };
 
@@ -43,7 +43,7 @@ static void rpcmem_expand(rpcmem_t *m) {
   int stacksize = m->capacity - m->sp;
   m->capacity *= 2;
   m->data = (unsigned char*)realloc(m->data, m->capacity);
-  memcpy(m->data + m->capacity - stacksize, m->data + m->sp, stacksize);
+  memmove(m->data + m->capacity - stacksize, m->data + m->sp, stacksize);
 }
 
 static int rpcmem_tobuf(const char *fname, const rpcmem_t *m, char **outbuf) {
