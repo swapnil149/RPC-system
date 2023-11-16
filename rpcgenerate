@@ -41,89 +41,6 @@ def gen_basis_types_unpackers() -> str:
     return {}
 
 
-# IDL:
-"""
-struct Person {
-    int age;
-    string hobbies[4];
-};
-
-struct People {
-    Person people[4];
-};
-
-Person get_nth_person(People people, int n, int somenums[3][4]);
-Person get_first_person2(Person people[4]);
-"""
-
-# PROXY example (caller):
-"""
-void pack_Person(Person person, rpcmem_t *MEM) {
-    pack_int(person.age, MEM);
-    for (int __i = 0; __i < 4; __i++) {
-        pack_string(person.hobbies[__i], MEM);
-    }
-}
-
-Person unpack_Person(rpcmem_t *MEM) {
-    Person result;
-    for (int __i = (4) - 1; __i >= 0; __i--) {
-        result.hobbies[__i] = unpack_string(MEM);
-    }
-    result.age = unpack_int(MEM);
-    return result
-}
-
-void pack_People(People people, rpcmem_t *MEM) {
-    for (int __i = 0; __i < 4; __i++) {
-        Pack_Person(people.people[__i], MEM);
-    }
-}
-
-People unpack_People(rpcmem_t *MEM) {
-    People result;
-    for (int __i = (4) - 1; __i > 0; __i++) {
-        result.person[__i - 1] = unpack_Person(MEM);
-    }
-    return result;
-}
-
-Person get_first_person2(Person people[4]) {
-    // boilerplate declare result and mem
-
-    for (int i = 0; i < 4; i++) {
-        Pack_Person(people.people[__i], MEM);
-    }
-
-    // boilerplate send and receive mem
-
-    for (int i = 0; i < 4; i++) {
-        Pack_Person(people.people[__i], MEM);
-    }
-
-}
-
-Person get_nth_person(People people, int n, int somenums[3][4]) {
-    // every non void function has a return value named result
-    Person result;
-    rpcmem_t *MEM = rpcmem_new();
-
-    pack_People(people, MEM);
-    pack_int(n, MEM);
-    for (int __i = 0; __i < 3 * 4; __i++) {
-        pack_int(somenums[0][__i], MEM);
-    }
-
-    rpccall("get_nth_person", MEM);
-    rpcreceive(MEM);
-
-    result = unpack_Person(MEM);
-
-    return result;
-}
-
-"""
-
 
 def gen_packing_code(var, struct_def, packers):
     """
@@ -240,10 +157,6 @@ if __name__ == '__main__':
     stub_boilerplate = gen_stub_boilerplate()
 
     struct_defs = get_idl_struct_definitions(idl_json)
-    # {
-    #     'Person': {'age': 'int', 'hobbies': 'string[4]'},
-    #     'People': {'people': 'Person[4]'}
-    # }
     func_decls = get_idl_function_declarations(idl_json)
 
     # TBD what these actually contain
