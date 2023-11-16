@@ -27,11 +27,14 @@ static void pack_rpcptr(rpcptr_t x, rpcmem_t *m) { pack_int(x, m); }
 
 static void pack_float(float f, rpcmem_t *m) { pack_int(*(unsigned *)&f, m); }
 
-static void pack_string(string s, rpcmem_t m) {
-  (void)s; // TODO
-  (void)m;
+static void pack_string(string s, rpcmem_t *m) {
+  pack_int(s.length(), m); // Pack the length of the string
+  rpcptr_t strPtr = m->hp;  // Get the current heap pointer
+  for (char c : s) {
+    m->data[m->hp++] = c; // Pack each character to the heap
+  }
+  pack_rpcptr(strPtr, m); // Pack the pointer to the string on the heap
 }
-
 //
 // UNPACK
 //
@@ -53,8 +56,12 @@ static float unpack_float(rpcmem_t *m) {
 }
 
 static string unpack_string(rpcmem_t *m) {
-  string result;
-  (void)m; // TODO
+  rpcptr_t strPtr = unpack_rpcptr(m); // Unpack the pointer to the string on the heap
+  int len = unpack_int(m);  // Unpack the length of the string
+  string result = "";
+  for (int i = 0; i < len; ++i) {
+    result += m->data[strPtr + i]; // Unpack each character from the heap
+  }
   return result;
 }
 
