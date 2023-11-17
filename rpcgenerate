@@ -56,11 +56,23 @@ def read_idl_to_json(filename) -> dict:
 
 
 def gen_proxy_boilerplate() -> str:
-    return '\n'.join([basis_types_boilerplate, mem_boilerplate, transmit_boilerplate])
+    socket = "#define SOCKET (*RPCPROXYSOCKET)"
+    return '\n'.join([
+        basis_types_boilerplate,
+        mem_boilerplate,
+        socket,
+        transmit_boilerplate,
+    ])
 
 
 def gen_stub_boilerplate() -> str:
-    return '\n'.join([basis_types_boilerplate, mem_boilerplate, transmit_boilerplate])
+    socket = "#define SOCKET (*RPCSTUBSOCKET)"
+    return '\n'.join([
+        basis_types_boilerplate,
+        mem_boilerplate,
+        socket,
+        transmit_boilerplate,
+    ])
 
 
 def get_idl_struct_definitions(idl_json: dict) -> dict:

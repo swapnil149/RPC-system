@@ -34,7 +34,6 @@ static void rpc_send(const char *fname, const __rpcmem_t *mem) {
 
 static void rpc_recv(char *fname, __rpcmem_t *mem) {
   int msg_len, prefixlen;
-
   SOCKET->read(&msg_len, sizeof(msg_len));
 
   char *buf = (char *)malloc(msg_len);
@@ -42,6 +41,7 @@ static void rpc_recv(char *fname, __rpcmem_t *mem) {
 
   sscanf(buf, PREFIX_FMT "%n", fname, &mem->sp, &prefixlen);
   memcpy(mem->data, buf + prefixlen, msg_len - prefixlen);
+
   free(buf);
 }
 

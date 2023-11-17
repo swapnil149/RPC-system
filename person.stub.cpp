@@ -3,8 +3,9 @@
 using namespace std;
 #include "common/basis.h"
 #include "common/mem.h"
-#include "common/transmit.h"
 #include "person.idl"
+#define SOCKET (*RPCSTUBSOCKET)
+#include "common/transmit.h"
 
 void __pack_Person(Person bandhi, __rpcmem_t *mem) {
   __pack_string(bandhi.name, mem);
