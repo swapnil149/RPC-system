@@ -14,24 +14,24 @@
 #define MAX_FNAME_LEN 80
 #define MAX_PREFIX_LEN (MAX_FNAME_LEN + 20) // rough estimate
 
-typedef uint32_t rpcptr_t;
+typedef uint32_t __rpcptr_t;
 
-struct rpcmem_t {
+struct __rpcmem_t {
   unsigned char *data;
-  rpcptr_t hp;       // heap ptr
-  rpcptr_t sp;       // stack ptr
-  rpcptr_t capacity; // internal use only
+  __rpcptr_t hp;       // heap ptr
+  __rpcptr_t sp;       // stack ptr
+  __rpcptr_t capacity; // internal use only
 };
 
-static rpcmem_t *rpcmem_new() {
-  rpcmem_t *m = (rpcmem_t *)malloc(sizeof(*m));
+static __rpcmem_t *rpcmem_new() {
+  __rpcmem_t *m = (__rpcmem_t *)malloc(sizeof(*m));
   m->hp = 0;
   m->sp = m->capacity = INITIAL_CAPACITY;
   m->data = (unsigned char *)malloc(m->capacity);
   return m;
 }
 
-static void rpcmem_free(rpcmem_t **m) {
+static void rpcmem_free(__rpcmem_t **m) {
   free((*m)->data);
   free(*m);
   *m = NULL;
@@ -39,14 +39,14 @@ static void rpcmem_free(rpcmem_t **m) {
 
 // clang-format off
 
-static void rpcmem_expand(rpcmem_t *m) { 
+static void rpcmem_expand(__rpcmem_t *m) { 
   int stacksize = m->capacity - m->sp;
   m->capacity *= 2;
   m->data = (unsigned char*)realloc(m->data, m->capacity);
   memmove(m->data + m->capacity - stacksize, m->data + m->sp, stacksize);
 }
 
-static int rpcmem_tobuf(const char *fname, const rpcmem_t *m, char **outbuf) {
+static int rpcmem_tobuf(const char *fname, const __rpcmem_t *m, char **outbuf) {
   int prefixlen = snprintf(NULL, 0, PREFIX_FMT, fname, m->hp);
   assert(prefixlen < MAX_PREFIX_LEN && prefixlen);
   *outbuf = (char *)malloc(prefixlen + m->hp + (m->capacity - m->sp));
@@ -59,12 +59,15 @@ static int rpcmem_tobuf(const char *fname, const rpcmem_t *m, char **outbuf) {
 // clang-format on
 
 static void rpcmem_frombuf(const char *inbuf, int len,
-                           char fname[MAX_PREFIX_LEN], rpcmem_t *m) {
+                           char fname[MAX_PREFIX_LEN], __rpcmem_t *m) {
   int stackptr, prefixlen;
   sscanf(inbuf, PREFIX_FMT "%n", fname, &stackptr, &prefixlen);
   m->sp = stackptr;
   m->hp = 0;
-  memcpy(m->data, inbuf + prefixlen, len);
+  memcpy(m->data, inbuf + prefixlen, len - prefixlen);
 }
+
+#undef PREFIX_FMT
+#undef MAX_PREFIX_LEN
 
 #endif

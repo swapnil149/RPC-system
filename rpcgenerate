@@ -4,8 +4,6 @@ import json
 import sys
 import re
 import os
-import itertools
-from pprint import pprint
 from textwrap import indent
 
 IDL_TO_JSON_EXECUTABLE = './samples/idl_to_json'
@@ -14,6 +12,7 @@ ITER = "i"
 
 TAB = '\t'
 
+RPCMEM_T = "__rpcmem_t"
 MEM = "mem"
 PACK = "__pack"
 UNPACK = "__unpack"
@@ -37,6 +36,7 @@ def check_usage(args):
 
 
 def read_idl_to_json(filename) -> dict:
+    return {}  # temporarily skip for local development
     try:
         assert len(sys.argv) == 2, "Wrong number of arguments"
         assert os.path.isfile(
@@ -109,7 +109,7 @@ def sumexp(nums: list[int]):
     return " * ".join([str(n) for n in nums])
 
 
-def gen_packing_code(vars, types, packers, n_indents=0) -> str:
+def gen_packing_stmts(vars, types, packers, n_indents=0) -> str:
     pack_stmts = []
     for var, typ in zip(vars, types):
         inner_typ, dims = inner_type_and_dims(typ)
@@ -117,7 +117,7 @@ def gen_packing_code(vars, types, packers, n_indents=0) -> str:
     return indent('\n'.join(pack_stmts), '\t' * n_indents)
 
 
-def gen_unpacking_code(vars, types, unpackers, n_indents=0) -> str:
+def gen_unpacking_stmts(vars, types, unpackers, n_indents=0) -> str:
     unpack_stmts = []
     for var, typ in zip(reversed(vars), reversed(types)):
         inner_typ, dims = inner_type_and_dims(typ)
@@ -131,8 +131,8 @@ def gen_struct_packer(struct_name: str, struct_def: dict, packers: dict) -> str:
                       for member in struct_def["members"]]
     struct_memtypes = [member["type"] for member in struct_def["members"]]
     packer_def = f"""
-void {PACK}_{struct_name}({struct_name} {struct_var}, rpcmem_t *{MEM}) {{
-{gen_packing_code(struct_members, struct_memtypes, packers, 2)}
+void {PACK}_{struct_name}({struct_name} {struct_var}, {RPCMEM_T} *{MEM}) {{
+{gen_packing_stmts(struct_members, struct_memtypes, packers, 2)}
 }}"""
     return packer_def
 
@@ -143,15 +143,15 @@ def gen_struct_unpacker(struct_name: str, struct_def: dict, unpackers: dict) -> 
                       for member in struct_def["members"]]
     result_memtypes = [member["type"] for member in struct_def["members"]]
     unpacker_code = f"""
-{struct_name} {UNPACK}_{struct_name}(rpcmem_t *{MEM}) {{
+{struct_name} {UNPACK}_{struct_name}({RPCMEM_T} *{MEM}) {{
     {struct_name} {result_var};
-{gen_unpacking_code(result_members, result_memtypes, unpackers, 2)}
+{gen_unpacking_stmts(result_members, result_memtypes, unpackers, 2)}
     return {result_var};
 }}"""
     return unpacker_code
 
 
-def stringify_arg(arg):
+def type_space_name(arg):
     inner_typ, dims = inner_type_and_dims(arg["type"])
     return inner_typ + " " + arg["name"] + "".join([f"[{d}]" for d in dims])
 
@@ -166,11 +166,14 @@ def gen_proxy_def(function_name: str, func_decl: dict, packers: dict, unpackers:
     unpack_result = f"{return_type} {gen_unpack(result_var, return_type, unpackers)}" if return_type != "void" else ""
     return_result = f"return {result_var};" if return_type != "void" else ""
 
-    return f"""{return_type} {function_name}({", ".join([stringify_arg(a) for a in arguments])}) {{
-    rpcmem_t *{MEM} = rpcmem_new();
+    params = ", ".join([type_space_name(a) for a in arguments])
+
+    return f"""{return_type} {function_name}({params}) {{
+    {RPCMEM_T} *{MEM} = rpcmem_new();
     char fname[MAX_FNAME_LEN] = "{function_name}";
 
-{gen_packing_code(argnames, argtys, packers, 2)}
+{gen_packing_stmts(argnames, argtys, packers, 2)}
+
     rpc_send(fname, {MEM});
     rpc_recv(fname, {MEM});
 
@@ -190,15 +193,15 @@ def gen_stub_def(function_name: str, func_decl: dict, packers: dict, unpackers: 
     argnames = [a["name"] for a in arguments]
     argtys = [a["type"] for a in arguments]
 
-    arg_declarations = "\n".join([stringify_arg(a) + ';' for a in arguments])
+    arg_declarations = "\n".join([type_space_name(a) + ';' for a in arguments])
 
     save_result = ""
     if return_type != "void":
         save_result = f"{return_type} {result_var} = "
 
-    return f"""void __{function_name}(rpcmem_t *{MEM}) {{
+    return f"""void __{function_name}({RPCMEM_T} *{MEM}) {{
 {indent(arg_declarations, TAB * 2)}
-{indent(gen_unpacking_code(argnames, argtys, unpackers), TAB * 2)}
+{gen_unpacking_stmts(argnames, argtys, unpackers, 2)}
     {save_result}{function_name}({", ".join(argnames)});
     {MEM}->hp = 0;
     {MEM}->sp = {MEM}->capacity;
@@ -208,7 +211,7 @@ def gen_stub_def(function_name: str, func_decl: dict, packers: dict, unpackers: 
 
 
 def gen_stub_dispatcher(func_decls: dict) -> str:
-    return "// dispatcher"
+    return f"""// dispatcher"""
 
 
 def write_proxy(proxy_code: str, idl_filename: str):
@@ -223,8 +226,7 @@ def write_stub(stub_code: str, idl_filename: str):
 
 def main():
     idl_filename = check_usage(sys.argv)
-    # idl_json = read_idl_to_json(idl_filename)
-    idl_json = {}
+    idl_json = read_idl_to_json(idl_filename)
     with open(idl_filename.removesuffix(".idl") + ".json", "r") as f:
         idl_json = json.load(f)
     idl_include = f"#include \"{idl_filename}\""
@@ -262,28 +264,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    # idl_json = {}
-    # with open(sys.argv[1], "r") as f:
-    #     idl_json = json.load(f)
-    #
-    # struct_defs = get_idl_struct_definitions(idl_json)  # python objects
-    #
-    # packers = {}
-    # unpackers = {}
-    # for name, struct_def in reversed(struct_defs.items()):
-    #     print("GENERATING", name)
-    #     packers[name] = gen_struct_packer(name, struct_def, packers)
-    #     unpackers[name] = gen_struct_unpacker(name, struct_def, unpackers)
-    #
-    # print("\n".join(packers.values()))
-    # print("\n".join(unpackers.values()))
-    #
-    # func_decls = get_idl_function_declarations(idl_json)  # python objects
-    # proxy_funcs = "\n".join([gen_proxy_def(name, dec, packers, unpackers)
-    #                          for name, dec in func_decls.items()])
-    #
-    # stub_funcs = "\n".join([gen_stub_def(name, dec, packers, unpackers)
-    #                         for name, dec in func_decls.items()])
-    #
-    # print(proxy_funcs)
-    # print(stub_funcs)

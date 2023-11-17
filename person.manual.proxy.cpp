@@ -16,7 +16,7 @@ using namespace std;
 // using namespace C150NETWORK; // for all the comp150 utilities
 
 // __packers
-void __pack_Person(Person p, rpcmem_t *mem) {
+void __pack_Person(Person p, __rpcmem_t *mem) {
   __pack_string(p.name, mem);
   __pack_int(p.age, mem);
   for (int i = 0; i < 5; i++) {
@@ -24,7 +24,7 @@ void __pack_Person(Person p, rpcmem_t *mem) {
   }
 }
 
-void __pack_People(People p, rpcmem_t *mem) {
+void __pack_People(People p, __rpcmem_t *mem) {
   for (int i = 0; i < 4; i++) {
     __pack_Person(p.people[i], mem);
   }
@@ -34,7 +34,7 @@ void __pack_People(People p, rpcmem_t *mem) {
 }
 
 // __unpackers
-Person __unpack_Person(rpcmem_t *mem) {
+Person __unpack_Person(__rpcmem_t *mem) {
   Person result;
   for (int i = 5; i > 0; i--) {
     result.lucky_numbers[i - 1] = __unpack_int(mem);
@@ -44,7 +44,7 @@ Person __unpack_Person(rpcmem_t *mem) {
   return result;
 }
 
-People __unpack_People(rpcmem_t *mem) {
+People __unpack_People(__rpcmem_t *mem) {
   People result;
   for (int i = 4; i > 0; i--) {
     result.nicknames[i - 1] = __unpack_string(mem);
@@ -57,7 +57,7 @@ People __unpack_People(rpcmem_t *mem) {
 
 // proxy functions
 Person nth_person(People ppl, int n) {
-  rpcmem_t *mem = rpcmem_new();
+  __rpcmem_t *mem = rpcmem_new();
   char fname[MAX_FNAME_LEN] = "nth_person";
 
   __pack_People(ppl, mem);
@@ -75,7 +75,7 @@ Person nth_person(People ppl, int n) {
 }
 
 float avg_4D(int nums[8][8][7][8]) {
-  rpcmem_t *mem = rpcmem_new();
+  __rpcmem_t *mem = rpcmem_new();
   char fname[MAX_FNAME_LEN] = "avg_4D";
 
   for (int i = 0; i < (8 * 8 * 7 * 8); i++)
