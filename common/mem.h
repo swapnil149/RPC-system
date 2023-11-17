@@ -67,7 +67,4 @@ static void rpcmem_frombuf(const char *inbuf, int len,
   memcpy(m->data, inbuf + prefixlen, len);
 }
 
-#undef PREFIX_FMT
-#undef MAX_PREFIX_LEN
-
 #endif

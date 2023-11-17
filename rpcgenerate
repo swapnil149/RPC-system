@@ -15,6 +15,8 @@ ITER = "i"
 TAB = '\t'
 
 MEM = "mem"
+PACK = "__pack"
+UNPACK = "__unpack"
 
 includes = """#include <stdio.h>
 #include <string>
@@ -80,7 +82,7 @@ def gen_pack(var, typ, packers, dims=None) -> str:
     {gen_pack(var + multiindex, typ, packers)}
 }}"""
     else:
-        return f"pack_{typ}({var}, {MEM});"
+        return f"{PACK}_{typ}({var}, {MEM});"
 
 
 def gen_unpack(var, typ, unpackers, dims=None) -> str:
@@ -92,7 +94,7 @@ def gen_unpack(var, typ, unpackers, dims=None) -> str:
     {gen_unpack(var + multiindex, typ, unpackers)}
 }}"""
     else:
-        return f"{var} = unpack_{typ}({MEM});"
+        return f"{var} = {UNPACK}_{typ}({MEM});"
 
 
 def inner_type_and_dims(raw_type: str) -> tuple[str, list[int]]:
@@ -129,7 +131,7 @@ def gen_struct_packer(struct_name: str, struct_def: dict, packers: dict) -> str:
                       for member in struct_def["members"]]
     struct_memtypes = [member["type"] for member in struct_def["members"]]
     packer_def = f"""
-void pack_{struct_name}({struct_name} {struct_var}, rpcmem_t *{MEM}) {{
+void {PACK}_{struct_name}({struct_name} {struct_var}, rpcmem_t *{MEM}) {{
 {gen_packing_code(struct_members, struct_memtypes, packers, 2)}
 }}"""
     return packer_def
@@ -141,7 +143,7 @@ def gen_struct_unpacker(struct_name: str, struct_def: dict, unpackers: dict) -> 
                       for member in struct_def["members"]]
     result_memtypes = [member["type"] for member in struct_def["members"]]
     unpacker_code = f"""
-{struct_name} unpack_{struct_name}(rpcmem_t *{MEM}) {{
+{struct_name} {UNPACK}_{struct_name}(rpcmem_t *{MEM}) {{
     {struct_name} {result_var};
 {gen_unpacking_code(result_members, result_memtypes, unpackers, 2)}
     return {result_var};
@@ -166,10 +168,11 @@ def gen_proxy_def(function_name: str, func_decl: dict, packers: dict, unpackers:
 
     return f"""{return_type} {function_name}({", ".join([stringify_arg(a) for a in arguments])}) {{
     rpcmem_t *{MEM} = rpcmem_new();
+    char fname[MAX_FNAME_LEN] = "{function_name}";
 
 {gen_packing_code(argnames, argtys, packers, 2)}
-    rpc_send(\"{function_name}\", {MEM});
-    rpc_receive({MEM});
+    rpc_send(fname, {MEM});
+    rpc_recv(fname, {MEM});
 
     {unpack_result}
 

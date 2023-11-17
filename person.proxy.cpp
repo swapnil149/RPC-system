@@ -1,39 +1,28 @@
 #include <stdio.h>
 #include <string>
 using namespace std;
-
-#include "person.idl"
-
-// #include "c150debug.h"
-#include <cstdlib>
-
 #include "common/basis.h"
 #include "common/mem.h"
 #include "common/transmit.h"
+#include "person.idl"
 
-// #include "samples/rpcproxyhelper.h"
-
-// using namespace C150NETWORK; // for all the comp150 utilities
-
-// __packers
-void __pack_Person(Person p, rpcmem_t *mem) {
-  __pack_string(p.name, mem);
-  __pack_int(p.age, mem);
+void __pack_Person(Person bandhi, rpcmem_t *mem) {
+  __pack_string(bandhi.name, mem);
+  __pack_int(bandhi.age, mem);
   for (int i = 0; i < 5; i++) {
-    __pack_int(p.lucky_numbers[i], mem);
+    __pack_int(bandhi.lucky_numbers[i], mem);
   }
 }
 
-void __pack_People(People p, rpcmem_t *mem) {
+void __pack_People(People bandhi, rpcmem_t *mem) {
   for (int i = 0; i < 4; i++) {
-    __pack_Person(p.people[i], mem);
+    __pack_Person(bandhi.people[i], mem);
   }
   for (int i = 0; i < 4; i++) {
-    __pack_string(p.nicknames[i], mem);
+    __pack_string(bandhi.nicknames[i], mem);
   }
 }
 
-// __unpackers
 Person __unpack_Person(rpcmem_t *mem) {
   Person result;
   for (int i = 5; i > 0; i--) {
@@ -55,39 +44,33 @@ People __unpack_People(rpcmem_t *mem) {
   return result;
 }
 
-// proxy functions
+float avg_4D(int nums[8][8][8][8]) {
+  rpcmem_t *mem = rpcmem_new();
+  char fname[MAX_FNAME_LEN] = "avg_4D";
+
+  for (int i = 0; i < 8 * 8 * 8 * 8; i++) {
+    __pack_int(nums[0][0][0][i], mem);
+  }
+  rpc_send(fname, mem);
+  rpc_recv(fname, mem);
+
+  float result = __unpack_float(mem);
+
+  rpcmem_free(&mem);
+  return result;
+}
+
 Person nth_person(People ppl, int n) {
   rpcmem_t *mem = rpcmem_new();
   char fname[MAX_FNAME_LEN] = "nth_person";
 
   __pack_People(ppl, mem);
   __pack_int(n, mem);
-
   rpc_send(fname, mem);
   rpc_recv(fname, mem);
 
-  Person result;
-  result = __unpack_Person(mem);
+  Person result = __unpack_Person(mem);
 
   rpcmem_free(&mem);
-
-  return result;
-}
-
-float avg_4D(int nums[8][8][7][8]) {
-  rpcmem_t *mem = rpcmem_new();
-  char fname[MAX_FNAME_LEN] = "avg_4D";
-
-  for (int i = 0; i < (8 * 8 * 7 * 8); i++)
-    __pack_int(nums[0][0][0][i], mem);
-
-  rpc_send(fname, mem);
-  rpc_recv(fname, mem);
-
-  float result;
-  result = __unpack_float(mem);
-
-  rpcmem_free(&mem);
-
   return result;
 }
