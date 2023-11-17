@@ -2,47 +2,19 @@
 import subprocess
 import json
 import sys
+import re
 import os
+import itertools
+from pprint import pprint
+from textwrap import indent
 
-IDL_TO_JSON_EXECUTABLE = './idl_to_json'
+IDL_TO_JSON_EXECUTABLE = './samples/idl_to_json'
 
-# Given an idl filename, convert the IDL to a JSON object, and return it
-# changed read_idl_to_json(str) ==> read_idl_to_json()
-def read_idl_to_json() -> dict:
-    try:
-    #
-    #     Make sure invoked properly
-    #
-        assert len(sys.argv) == 2, "Wrong number of arguments"
+ITER = "i"
 
-        #
-        #     Make sure IDL file exists and is readable
-        #
-        filename = sys.argv[1]
-        assert os.path.isfile(filename), f"Path {filename} does not designate a file"
-        assert os.access(filename, os.R_OK), f"File {filename} is not readable" 
+TAB = '\t'
 
-        #
-        #     Make sure idl_to_json exists and is executable
-        #
-        assert os.path.isfile(IDL_TO_JSON_EXECUTABLE), f"Path {IDL_TO_JSON_EXECUTABLE} does not designate a file...run \"make\" to create it" 
-        assert os.access(IDL_TO_JSON_EXECUTABLE, os.X_OK), f"File {IDL_TO_JSON_EXECUTABLE} exists but is not executable"
-
-        #
-        #     Parse declarations into a Python dictionary
-        #
-        decls = json.loads(subprocess.check_output([IDL_TO_JSON_EXECUTABLE, filename]))
-
-        #
-        # Loop printing each function signature
-        #
-        #print(decls)
-        return decls
-
-    except Exception as e:
-        print(str(e), file=sys.stderr)
-        print(f"Usage: {sys.argv[0]} <idlfilename>", file=sys.stderr)
-        pass
+MEM = "mem"
 
 includes = """
 #include <stdio.h>
@@ -62,143 +34,192 @@ transmit_boilerplate = """
 #include "common/transmit.h"
 """
 
+basis_types = ["int", "float", "bool", "string", "rpcptr_t"]
+
+
+def check_usage(args):
+    if len(args) != 2:
+        sys.stderr.write("USAGE: ./rpcgenerate [filename.idl]")
+        exit(1)
+    return args[1]
+
+
+def read_idl_to_json(filename) -> dict:
+    try:
+        assert len(sys.argv) == 2, "Wrong number of arguments"
+        assert os.path.isfile(
+            filename), f"Path {filename} does not designate a file"
+        assert os.access(filename, os.R_OK), f"File {filename} is not readable"
+        assert os.path.isfile(
+            IDL_TO_JSON_EXECUTABLE), f"Path {IDL_TO_JSON_EXECUTABLE} does not designate a file...run \"make\" to create it"
+        assert os.access(IDL_TO_JSON_EXECUTABLE,
+                         os.X_OK), f"File {IDL_TO_JSON_EXECUTABLE} exists but is not executable"
+        decls = json.loads(subprocess.check_output(
+            [IDL_TO_JSON_EXECUTABLE, filename]))
+        return decls
+    except Exception as e:
+        print(str(e), file=sys.stderr)
+        print(f"Usage: {sys.argv[0]} <idlfilename>", file=sys.stderr)
+        exit(1)
+
+
 def gen_proxy_boilerplate() -> str:
-    return '\n'.join([ basis_types_boilerplate, mem_boilerplate, transmit_boilerplate])
+    return '\n'.join([basis_types_boilerplate, mem_boilerplate, transmit_boilerplate])
 
 
 def gen_stub_boilerplate() -> str:
-    return '\n'.join([ basis_types_boilerplate, mem_boilerplate, transmit_boilerplate])
+    return '\n'.join([basis_types_boilerplate, mem_boilerplate, transmit_boilerplate])
 
 
 def get_idl_struct_definitions(idl_json: dict) -> dict:
     types = idl_json["types"]
-    return [t for t in types if t['type_of_type'] == 'struct']
+    return {t: v for t, v in types.items() if v['type_of_type'] == 'struct'}
+
 
 def get_idl_function_declarations(idl_json: dict) -> dict:
     return idl_json["functions"]
 
 
-def gen_basis_types_packers() -> dict:
-    return {
-        "int": "",
-        "float": "",
-        "bool": "",
-        "rpcptr_t": "",
-        "string": "",
-    }
+def gen_pack(var, typ, packers, dims=None) -> str:
+    if not typ in packers and not typ in basis_types:
+        raise RuntimeError(f"Type {typ} not previously declared")
 
-def gen_basis_types_unpackers() -> dict:
-    return {
-        "int": "",
-        "float": "",
-        "bool": "",
-        "rpcptr_t": "",
-        "string": "",
-    }
+    if dims:
+        multiindex = "".join(["[0]" for _ in dims[1:]]) + f"[{ITER}]"
+        return f"""for (int {ITER} = 0; {ITER} < {sumexp(dims)}; {ITER}++) {{
+\t{gen_pack(var + multiindex, typ, packers)}
+}}"""
+    else:
+        return f"pack_{typ}({var}, {MEM});"
 
-def gen_one_pack(var, type, packers):
-    if not type in packers:
-        raise Exception(f"Type {type} not previously declared")
-    return f"pack_{type}({var}, mem))"
 
-def gen_one_unpack(var, type, unpackers):
-    if not type in unpackers:
-        raise Exception(f"Type {type} not previously declared")
-    return f"{var} = unpack_{type}(mem)"
+def gen_unpack(var, typ, unpackers, dims=None) -> str:
+    if not typ in unpackers and not typ in basis_types:
+        raise RuntimeError(f"Type {typ} not previously declared")
+    if dims:
+        multiindex = "".join(["[0]" for _ in dims[1:]]) + f"[{ITER} - 1]"
+        return f"""for (int {ITER} = {sumexp(dims)}; {ITER} > 0; {ITER}--) {{
+\t{gen_unpack(var + multiindex, typ, unpackers)}
+}}"""
+    else:
+        return f"{var} = unpack_{typ}({MEM});"
 
-def gen_packing_code(var, struct_def, packers):
-    """
-    Assumes an `rpcmem_t *MEM` is in scope.
-    Generates the C++ statements to pack the type.
-    """
+
+def inner_type_and_dims(raw_type: str) -> tuple[str, list[int]]:
+    if raw_type.startswith('__'):
+        inner_type = re.sub(r"[_\]\[\d]", "", raw_type)
+        dims = [int(dim) for dim in re.findall(r"\d+", raw_type)]
+        return inner_type, dims
+    return raw_type, []
+
+
+def sumexp(nums: list[int]):
+    return " * ".join([str(n) for n in nums])
+
+
+def gen_packing_code(vars, types, packers, n_indents=0) -> str:
     pack_stmts = []
-    for member in struct_def["members"]:
-        member_name = member["name"]
-        member_type = member["type"]
-        if 
-        pack_stmts.append(f"{var}.{member_name}", member_type, packers)
+    for var, typ in zip(vars, types):
+        inner_typ, dims = inner_type_and_dims(typ)
+        pack_stmts.append(gen_pack(var, inner_typ, packers, dims))
+    return indent('\n'.join(pack_stmts), '\t' * n_indents)
 
-def gen_unpacking_code(var, struct_def, unpackers):
-    """
-    Assumes an `rpcmem_t *MEM`, and `<type> result` is in scope.
-    Generates the C++ statements to unpack the type.
-    """
-    pass
+
+def gen_unpacking_code(vars, types, unpackers, n_indents=0) -> str:
+    unpack_stmts = []
+    for var, typ in zip(reversed(vars), reversed(types)):
+        inner_typ, dims = inner_type_and_dims(typ)
+        unpack_stmts.append(gen_unpack(var, inner_typ, unpackers, dims))
+    return indent('\n'.join(unpack_stmts), '\t' * n_indents)
+
 
 def gen_struct_packer(struct_name: str, struct_def: dict, packers: dict) -> str:
-    if not struct_name in packers:
-        raise Exception(f"Struct {struct_name} not previously declared")
     struct_var = "bandhi"
+    struct_members = [struct_var + '.' + member["name"]
+                      for member in struct_def["members"]]
+    struct_memtypes = [member["type"] for member in struct_def["members"]]
     packer_def = f"""
-    void pack_{struct_name}({struct_name} {struct_var}, rpcmem_t *MEM) {{
-        {gen_packing_code(struct_var, struct_def, packers)}
-    }}
-    """
+void pack_{struct_name}({struct_name} {struct_var}, rpcmem_t *{MEM}) {{
+{gen_packing_code(struct_members, struct_memtypes, packers, 1)}
+}}"""
     return packer_def
 
 
 def gen_struct_unpacker(struct_name: str, struct_def: dict, unpackers: dict) -> str:
-    if not struct_name in unpackers:
-        raise Exception(f"Struct {struct_name} not previously declared")
-
+    result_var = "result"
+    result_members = [result_var + '.' + member["name"]
+                      for member in struct_def["members"]]
+    result_memtypes = [member["type"] for member in struct_def["members"]]
     unpacker_code = f"""
-    {struct_name} unpack_{struct_name}(rpcmem_t *MEM) {{
-        {struct_name} result;
-        {gen_unpacking_code("result", struct_def, unpackers[struct_name])}
-        return result;
-    }}
-    """
+{struct_name} unpack_{struct_name}(rpcmem_t *{MEM}) {{
+\t{struct_name} {result_var};
+{gen_unpacking_code(result_members, result_memtypes, unpackers, 1)}
+\treturn {result_var};
+}}"""
     return unpacker_code
 
 
-def stringify_arguments(arguments):
-    return ""
+def stringify_arg(arg):
+    inner_typ, dims = inner_type_and_dims(arg["type"])
+    return inner_typ + " " + arg["name"] + "".join([f"[{d}]" for d in dims])
 
 
-def gen_proxy_def(func_decl: dict, packers: dict, unpackers: dict) -> str:
-    function_name = func_decl[function_name]
-    arguments = func_decl[arguments]
-    return_type = func_decl[return_type]
+def gen_proxy_def(function_name: str, func_decl: dict, packers: dict, unpackers: dict) -> str:
+    arguments = func_decl["arguments"]
+    argnames = [a["name"] for a in arguments]
+    argtys = [a["type"] for a in arguments]
+    return_type = func_decl["return_type"]
+    result_var = "result"
 
-    arguments_string = stringify_arguments(arguments)
+    declare_result = f"{return_type} {result_var};" if return_type != "void" else ""
+    unpack_result = gen_unpack(
+        result_var, return_type, unpackers) if return_type != "void" else ""
+    return_result = f"return {result_var};" if return_type != "void" else ""
 
-    declare_result = f"{return_type} result;" if return_type != "void" else ""
-    return_result = f"return result;" if return_type != "void" else ""
-
-    f"""
-    {return_type} {function_name}({arguments_string}) {{
+    return f"""{return_type} {function_name}({", ".join([stringify_arg(a) for a in arguments])}) {{
         {declare_result}
-        rpcmem_t *MEM = rpcmem_new();
-        {gen_packing_code(arguments)}
-        rpc_send(\"{function_name}\", MEM);
-        rpc_receive(MEM);
-        {gen_unpacking_code(return_type, unpackers)}
-        rpcmem_free(&MEM);
+        rpcmem_t *{MEM} = rpcmem_new();
+
+{gen_packing_code(argnames, argtys, packers, 1)}
+
+        rpc_send(\"{function_name}\", {MEM});
+        rpc_receive({MEM});
+
+        {unpack_result}
+
+        rpcmem_free(&{MEM});
         {return_result}
-    }}
-    """
-    pass
+}}
+"""
 
 
-def gen_stub_def(func_decl: dict, packers: dict, unpackers: dict) -> str:
-    function_name = func_decl["function_name"]
+def gen_stub_def(function_name: str, func_decl: dict, packers: dict, unpackers: dict) -> str:
     arguments = func_decl["arguments"]
     return_type = func_decl["return_type"]
+    result_var = "result"
 
-    arguments_string = stringify_arguments(arguments)
-    return f"""
-    {return_type} {function_name}({arguments_string}, rpcmem_t *MEM) {{
-        rpcmem_t *MEM = rpcmem_new();
-        {gen_unpacking_code()}
-        {function_name}({arguments});
-        {gen_packing_code()}
-    }}
-    """
-    pass
+    argnames = [a["name"] for a in arguments]
+    argtys = [a["type"] for a in arguments]
+
+    arg_declarations = "\n".join([stringify_arg(a) + ';' for a in arguments])
+
+    save_result = ""
+    if return_type != "void":
+        save_result = f"{return_type} {result_var} = "
+
+    return f"""void __{function_name}(rpcmem_t *{MEM}) {{
+{indent(arg_declarations, TAB)}
+{indent(gen_unpacking_code(argnames, argtys, unpackers), TAB)}
+        {save_result}{function_name}({", ".join(argnames)});
+        {MEM}->hp = 0;
+        {MEM}->sp = {MEM}->capacity;
+        {gen_pack(result_var, return_type, packers)}
+}}
+"""
 
 
-def gen_stub_dispatcher(func_decls: list[dict]) -> str:
-    pass
+def gen_stub_dispatcher(func_decls: dict) -> str:
+    return "// dispatcher"
 
 
 def write_proxy(proxy_code: str, idl_filename: str):
@@ -211,42 +232,73 @@ def write_stub(stub_code: str, idl_filename: str):
         f.write(stub_code)
 
 
-def extract_function_defs(packers: dict) -> list[str]:
-    return []
-
-
-if __name__ == '__main__':
-    idl_filename = sys.argv[1]
-    idl_json = read_idl_to_json(idl_filename)
+def main():
+    idl_filename = check_usage(sys.argv)
+    # idl_json = read_idl_to_json(idl_filename)
+    idl_json = {}
+    with open(idl_filename.strip(".idl") + ".json", "r") as f:
+        idl_json = json.load(f)
     idl_include = f"#include \"{idl_filename}\""
 
     proxy_boilerplate = gen_proxy_boilerplate()
     stub_boilerplate = gen_stub_boilerplate()
 
-    struct_defs = get_idl_struct_definitions(idl_json) #python objects
-    func_decls = get_idl_function_declarations(idl_json) #python objects
+    struct_defs = get_idl_struct_definitions(idl_json)  # python objects
+    func_decls = get_idl_function_declarations(idl_json)  # python objects
 
     # TBD what these actually contain
-    packers: dict = gen_basis_types_packers()
-    unpackers: dict = gen_basis_types_unpackers()
-    for name, struct_def in struct_defs:
+    packers = {}
+    unpackers = {}
+    for name, struct_def in reversed(struct_defs.items()):
         packers[name] = gen_struct_packer(name, struct_def, packers)
         unpackers[name] = gen_struct_unpacker(name, struct_def, unpackers)
 
-    proxy_funcs = [gen_proxy_def(f, packers, unpackers) for f in func_decls]
-    stub_funcs = [gen_stub_def(f, packers, unpackers) for f in func_decls]
+    packer_funcs = "\n".join(packers.values())
+    unpacker_funcs = "\n".join(unpackers.values())
+    proxy_funcs = "\n".join([gen_proxy_def(name, dec, packers, unpackers)
+                             for name, dec in func_decls.items()])
+    stub_funcs = "\n".join([gen_stub_def(name, dec, packers, unpackers)
+                            for name, dec in func_decls.items()])
 
     stub_dispatcher = gen_stub_dispatcher(func_decls)
 
-    packer_defs = packers.values()
-    unpacker_defs = unpackers.values()
-
-    proxy_code = '\n'.join(
-        [idl_include, proxy_boilerplate, packer_defs, unpacker_defs, proxy_funcs].flatten())
+    proxy_code = '\n'.join([idl_include, proxy_boilerplate,
+                            packer_funcs, unpacker_funcs, proxy_funcs])
     stub_code = '\n'.join(
-        [idl_include, stub_boilerplate, packer_defs, unpacker_defs, stub_funcs, stub_dispatcher].flatten())
+        [idl_include, stub_boilerplate, packer_funcs, unpacker_funcs, stub_funcs, stub_dispatcher])
+    proxy_code = ""
+    stub_code = ""
 
     write_proxy(proxy_code, idl_filename)
     write_stub(stub_code, idl_filename)
 
     print(idl_filename)
+
+
+if __name__ == '__main__':
+    main()
+    # idl_json = {}
+    # with open(sys.argv[1], "r") as f:
+    #     idl_json = json.load(f)
+    #
+    # struct_defs = get_idl_struct_definitions(idl_json)  # python objects
+    #
+    # packers = {}
+    # unpackers = {}
+    # for name, struct_def in reversed(struct_defs.items()):
+    #     print("GENERATING", name)
+    #     packers[name] = gen_struct_packer(name, struct_def, packers)
+    #     unpackers[name] = gen_struct_unpacker(name, struct_def, unpackers)
+    #
+    # print("\n".join(packers.values()))
+    # print("\n".join(unpackers.values()))
+    #
+    # func_decls = get_idl_function_declarations(idl_json)  # python objects
+    # proxy_funcs = "\n".join([gen_proxy_def(name, dec, packers, unpackers)
+    #                          for name, dec in func_decls.items()])
+    #
+    # stub_funcs = "\n".join([gen_stub_def(name, dec, packers, unpackers)
+    #                         for name, dec in func_decls.items()])
+    #
+    # print(proxy_funcs)
+    # print(stub_funcs)
