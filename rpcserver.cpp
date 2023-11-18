@@ -1,33 +1,31 @@
 // --------------------------------------------------------------
 //
-//                        simplefunctionclient.cpp
+//                        rpcserver.cpp
 //
 //        Author: Noah Mendelsohn
 //
 //
-//        This is a test program designed to call a few demonstration
-//        functions, after first enabling the COMP 150-IDS rpcproxyhelper.
-//        (The purpose of the helper is to open a TCP stream connection
-//        to the proper server, and to leave the socket pointer where
-//        the generated proxies can find it.
+//        This is a skeleton of a server program for RPC.
+//        Its quite generic. You may modify it if you need to,
+//        but it might also be usable in its current form.
 //
-//        NOTE: Although this example does nothing except test the
-//        functions, we may test your proxies and stubs with client
-//        applications that do real work.
+//        Note that you may want to use this as the main
+//        program for many different executables, each of which
+//        you link with a different specific stub, and save
+//        under a different executable name. So:
 //
-//        NOTE: When actually testing your RPC submission, you will use
-//        a different client application for each set of functions. This
-//        one is just to show a simple example.
+//             g++ rpcgameserver rpcserver.cpp gamestub.o
+//             g++ rpcstockquoteserver rpcserver.cpp stockquotestub.o
 //
-//        NOTE: The only thing that makes this different from
-//        an ordinary local application is the call to
-//        rpcproxyinitialize. If you commented that out, you could
-//        link this with the local version of simplefunction.o
-//        (which has the remotable function implementations)
+//
+//        This program loops accepting connections on a stream socket.
+//        On each connection it loops calling the main stub
+//        entry "dispatchFunction()" to invoke one function for
+//        the remote client.
 //
 //        COMMAND LINE
 //
-//              simplefunctionclient <servername>
+//              <whatevernameyoulinkthis as>
 //
 //        OPERATION
 //
@@ -36,39 +34,18 @@
 //
 // --------------------------------------------------------------
 
-// IMPORTANT! WE INCLUDE THE IDL FILE AS IT DEFINES THE INTERFACES
-// TO THE FUNCTIONS WE'RE REMOTING. OF COURSE, THE PARTICULAR IDL FILE
-// IS CHOSEN ACCORDING TO THE TEST OR APPLICATION
-//
-// NOTE THAT THIS IS THE SAME IDL FILE INCLUDED WITH THE PROXIES
-// AND STUBS, AND ALSO USED AS INPUT TO AUTOMATIC PROXY/STUB
-// GENERATOR PROGRAM
-
-#include "simplefunction.idl"
-
-#include "rpcproxyhelper.h"
+#include "rpcstubhelper.h"
 
 #include "c150debug.h"
 #include "c150grading.h"
 #include <fstream>
+#include <sstream>
 
 using namespace std;         // for C++ std library
 using namespace C150NETWORK; // for all the comp150 utilities
 
 // forward declarations
 void setUpDebugLogging(const char *logname, int argc, char *argv[]);
-
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-//
-//                    Command line arguments
-//
-// The following are used as subscripts to argv, the command line arguments
-// If we want to change the command line syntax, doing this
-// symbolically makes it a bit easier.
-//
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-const int serverArg = 1; // server name is 1st arg
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 //
@@ -81,16 +58,18 @@ int main(int argc, char *argv[]) {
   //
   //  Set up debug message logging
   //
-  setUpDebugLogging("simplefunctionclientdebug.txt", argc, argv);
+  stringstream logfilename;
+  logfilename << argv[0] << "debug.txt";
+  setUpDebugLogging(logfilename.str().c_str(), argc, argv);
 
   //
   // Make sure command line looks right
   //
-  if (argc != 2) {
-    fprintf(stderr, "Correct syntxt is: %s <servername> \n", argv[0]);
+  if (argc != 1) {
+    fprintf(stderr, "Correct syntxt is: %s ... (there are no arguments) \n",
+            argv[0]);
     exit(1);
   }
-
   //
   //  DO THIS FIRST OR YOUR ASSIGNMENT WON'T BE GRADED!
   //
@@ -103,30 +82,50 @@ int main(int argc, char *argv[]) {
   try {
 
     //
-    // Set up the socket so the proxies can find it
+    // Set up the socket so the stubs can find it
     //
-    rpcproxyinitialize(argv[serverArg]);
+    rpcstubinitialize();
 
     //
-    // Call (possibly remote) func1
+    // Infinite loop accepting connections
     //
-    printf("Calling func1()\n");
-    func1(); // remote call (we hope!)
-    printf("Returned from func1()\n");
+    while (1) {
 
-    //
-    // Call (possibly remote) func2
-    //
-    printf("Calling func2()\n");
-    func2(); // remote call (we hope!)
-    printf("Returned from func2()\n");
+      //
+      // We'll hang here until another client asks to connect
+      // When we drop through, RPCSTUBSOCKET will talk to that one
+      // Note that RPCSTUBSOCKET is a global variable set up by
+      // rpcstubinitialize and declared in rpcstubhelper.h
+      //
+      c150debug->printf(C150RPCDEBUG, "rpcserver.cpp:"
+                                      "calling C150StreamSocket::accept");
+      RPCSTUBSOCKET->accept();
 
-    //
-    // Call (possibly remote) func3
-    //
-    printf("Calling func3()\n");
-    func3(); // remote call (we hope!)
-    printf("Returned from func3()\n");
+      //
+      // infinite loop processing messages
+      //
+      while (1) {
+
+        //
+        // Call a function for the client. The stubs will do the
+        // work of reading and writing the stream, but will return on eof,
+        // which we'll get when client goes away.
+        //
+        dispatchFunction(); // call the stubs function dispatcher
+
+        if (RPCSTUBSOCKET->eof()) {
+          c150debug->printf(C150RPCDEBUG,
+                            "rpcserver.cpp: EOF signaled on input");
+          break;
+        }
+      } // end: while processing messages
+
+      //
+      // Done looping on this connection, close and wait for another
+      //
+      c150debug->printf(C150RPCDEBUG, "Calling C150StreamSocket::close");
+      RPCSTUBSOCKET->close();
+    } // end: while processing all connections
   }
 
   //
@@ -141,9 +140,6 @@ int main(int argc, char *argv[]) {
          << ": caught C150NetworkException: " << e.formattedExplanation()
          << endl;
   }
-
-  // Note that Linux will cleanly close the socket upon exit
-  // as long as there is no unread data on the connection.
 
   return 0;
 }
@@ -222,6 +218,6 @@ void setUpDebugLogging(const char *logname, int argc, char *argv[]) {
   // used only for things like fatal errors. So, the default is
   // for the system to run quietly without producing debug output.
   //
-  c150debug->enableLogging(C150ALLDEBUG | C150RPCDEBUG | C150APPLICATION |
-                           C150NETWORKTRAFFIC | C150NETWORKDELIVERY);
+  c150debug->enableLogging(C150RPCDEBUG | C150APPLICATION | C150NETWORKTRAFFIC |
+                           C150NETWORKDELIVERY);
 }

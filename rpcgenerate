@@ -233,12 +233,12 @@ def gen_stub_dispatcher(func_decls: dict) -> str:
 
 
 def write_proxy(proxy_code: str, idl_filename: str):
-    with open(f"{idl_filename.removesuffix('.idl')}.proxy.cpp", 'w') as f:
+    with open(re.sub(r'\.idl', '.proxy.cpp', idl_filename), 'w') as f:
         f.write(proxy_code)
 
 
 def write_stub(stub_code: str, idl_filename: str):
-    with open(f"{idl_filename.removesuffix('.idl')}.stub.cpp", 'w') as f:
+    with open(re.sub(r'\.idl', '.stub.cpp', idl_filename), 'w') as f:
         f.write(stub_code)
 
 
