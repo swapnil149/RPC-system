@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <string>
 using namespace std;
-#include "common/basis.h"
-#include "common/mem.h"
 #include "person.idl"
 #include "rpcproxyhelper.h"
 #define RPCSOCKET RPCPROXYSOCKET
+#include "common/basis.h"
+#include "common/mem.h"
 #include "common/transmit.h"
 
 void __pack_Person(Person bandhi, __rpcmem_t *mem) {

@@ -26,11 +26,20 @@ using namespace std;"""
 proxyhelper = "#include \"rpcproxyhelper.h\""
 stubhelper = "#include \"rpcstubhelper.h\""
 
-basis_types_boilerplate = """#include \"common/basis.h\""""
-mem_boilerplate = """#include \"common/mem.h\""""
-transmit_boilerplate = """#include \"common/transmit.h\""""
+boilerplate = '''#include "common/basis.h"
+#include "common/mem.h"
+#include "common/transmit.h"'''
 
 basis_types = ["int", "float", "bool", "string", "rpcptr_t"]
+
+
+def load_includes(include: str):
+    files_to_include = re.findall(r'#include "([\w\./]+)"', include)
+    contents = []
+    for filename in files_to_include:
+        with open(filename, "r") as f:
+            contents.append(f.read())
+    return '\n'.join(contents)
 
 
 def check_usage(args):
@@ -63,22 +72,18 @@ def read_idl_to_json(filename) -> dict:
 def gen_proxy_boilerplate() -> str:
     socket = f"#define {SOCKET} RPCPROXYSOCKET"
     return '\n'.join([
-        basis_types_boilerplate,
-        mem_boilerplate,
         proxyhelper,
         socket,
-        transmit_boilerplate,
+        boilerplate
     ])
 
 
 def gen_stub_boilerplate() -> str:
     socket = f"#define {SOCKET} RPCSTUBSOCKET"
     return '\n'.join([
-        basis_types_boilerplate,
-        mem_boilerplate,
         stubhelper,
         socket,
-        transmit_boilerplate,
+        boilerplate
     ])
 
 
