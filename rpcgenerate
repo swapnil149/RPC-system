@@ -8,7 +8,6 @@ from textwrap import indent
 
 IDL_TO_JSON_EXECUTABLE = './samples/idl_to_json'
 
-
 TAB = '\t'
 
 # Special variable names
@@ -19,9 +18,13 @@ PACK = "__pack"
 UNPACK = "__unpack"
 SOCKET = "RPCSOCKET"
 
+# includes
 includes = """#include <stdio.h>
 #include <string>
 using namespace std;"""
+
+proxyhelper = "#include \"rpcproxyhelper.h\""
+stubhelper = "#include \"rpcstubhelper.h\""
 
 basis_types_boilerplate = """#include \"common/basis.h\""""
 mem_boilerplate = """#include \"common/mem.h\""""
@@ -58,20 +61,22 @@ def read_idl_to_json(filename) -> dict:
 
 
 def gen_proxy_boilerplate() -> str:
-    socket = f"#define {SOCKET} (*RPCPROXYSOCKET)"
+    socket = f"#define {SOCKET} RPCPROXYSOCKET"
     return '\n'.join([
         basis_types_boilerplate,
         mem_boilerplate,
+        proxyhelper,
         socket,
         transmit_boilerplate,
     ])
 
 
 def gen_stub_boilerplate() -> str:
-    socket = f"#define {SOCKET} (*RPCSTUBSOCKET)"
+    socket = f"#define {SOCKET} RPCSTUBSOCKET"
     return '\n'.join([
         basis_types_boilerplate,
         mem_boilerplate,
+        stubhelper,
         socket,
         transmit_boilerplate,
     ])
@@ -184,12 +189,11 @@ def gen_proxy_def(function_name: str, func_decl: dict, packers: dict, unpackers:
 
     return f"""{return_type} {function_name}({params}) {{
     {RPCMEM_T} *{MEM} = rpcmem_new();
-    char fname[MAX_FNAME_LEN] = "{function_name}";
 
 {gen_packing_stmts(argnames, argtys, packers, 2)}
 
-    rpc_send(fname, {MEM});
-    rpc_recv(fname, {MEM});
+    rpc_send(\"{function_name}\", {MEM});
+    rpc_recv({MEM});
 
     {unpack_result}
 

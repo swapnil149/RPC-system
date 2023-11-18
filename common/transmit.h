@@ -1,9 +1,12 @@
 #ifndef TRANSMIT_H
 #define TRANSMIT_H
 
+#include "basis.h"
 #include <cstdio>
+#include <string>
+using namespace std;
 
-#ifndef RPCSOCKET
+#ifndef RPCSOCKET // just a placeholder to remove warnings
 #define RPCSOCKET dummysock
 static struct {
   void (*write)(const void *, int);
@@ -13,37 +16,26 @@ static struct {
 
 // #include "c150debug.h"
 // #include "c150streamsocket.h"
+#include "basis.h"
 #include "mem.h"
 #include <stdio.h>
 
-#define PREFIX_FMT "%s %08x"
-
-static void rpc_send(const char *fname, const __rpcmem_t *mem) {
-  int prefix_len = snprintf(NULL, 0, PREFIX_FMT, fname, mem->hp);
-  char *prefix = (char *)malloc(prefix_len);
-  snprintf(prefix, prefix_len, PREFIX_FMT, fname, mem->hp);
-
-  int msg_len = prefix_len + mem->hp + (mem->capacity - mem->sp);
-
-  RPCSOCKET->write(&msg_len, sizeof(msg_len)); // TODO: don't rely on endianness
-  RPCSOCKET->write(prefix, prefix_len);
+static void rpc_send(string fname, __rpcmem_t *mem) {
+  __pack_string(fname, mem);
+  int mem_size = mem->hp + (mem->capacity - mem->sp);
+  RPCSOCKET->write(&mem_size,
+                   sizeof(mem_size));          // TODO: don't rely on endianness
+  RPCSOCKET->write(&mem->hp, sizeof(mem->hp)); // TODO: don't rely on endianness
   RPCSOCKET->write(mem->data, mem->hp);
   RPCSOCKET->write(mem->data + mem->sp, mem->capacity - mem->sp);
-
-  free(prefix);
 }
 
-static void rpc_recv(char *fname, __rpcmem_t *mem) {
-  int msg_len, prefixlen;
-  RPCSOCKET->read(&msg_len, sizeof(msg_len));
-
-  char *buf = (char *)malloc(msg_len); // TODO: optimize unnecessary malloc
-  RPCSOCKET->read(buf, msg_len);
-
-  sscanf(buf, PREFIX_FMT "%n", fname, &mem->sp, &prefixlen);
-  memcpy(mem->data, buf + prefixlen, msg_len - prefixlen);
-
-  free(buf);
+static string rpc_recv(__rpcmem_t *mem) {
+  int mem_size;
+  RPCSOCKET->read(&mem_size, sizeof(mem_size));
+  RPCSOCKET->read(&mem->sp, sizeof(mem->sp));
+  RPCSOCKET->read(mem->data, mem_size);
+  return __unpack_string(mem);
 }
 
 #endif

@@ -8,12 +8,6 @@
 
 #define INITIAL_CAPACITY (1 << 16)
 
-//                 "<fname> <stackptr & heapptr>"
-#define PREFIX_FMT "%s %08x"
-
-#define MAX_FNAME_LEN 80
-#define MAX_PREFIX_LEN (MAX_FNAME_LEN + 20) // rough estimate
-
 typedef uint32_t __rpcptr_t;
 
 struct __rpcmem_t {
@@ -37,37 +31,11 @@ static void rpcmem_free(__rpcmem_t **m) {
   *m = NULL;
 }
 
-// clang-format off
-
-static void rpcmem_expand(__rpcmem_t *m) { 
+static void rpcmem_expand(__rpcmem_t *m) {
   int stacksize = m->capacity - m->sp;
   m->capacity *= 2;
-  m->data = (unsigned char*)realloc(m->data, m->capacity);
+  m->data = (unsigned char *)realloc(m->data, m->capacity);
   memmove(m->data + m->capacity - stacksize, m->data + m->sp, stacksize);
 }
-
-static int rpcmem_tobuf(const char *fname, const __rpcmem_t *m, char **outbuf) {
-  int prefixlen = snprintf(NULL, 0, PREFIX_FMT, fname, m->hp);
-  assert(prefixlen < MAX_PREFIX_LEN && prefixlen);
-  *outbuf = (char *)malloc(prefixlen + m->hp + (m->capacity - m->sp));
-  snprintf(*outbuf, MAX_PREFIX_LEN, PREFIX_FMT, fname, m->hp);
-  memcpy(*outbuf + prefixlen,         m->data,         m->hp);
-  memcpy(*outbuf + prefixlen + m->hp, m->data + m->sp, m->capacity - m->sp);
-  return prefixlen + m->hp + (m->capacity - m->sp);
-}
-
-// clang-format on
-
-static void rpcmem_frombuf(const char *inbuf, int len,
-                           char fname[MAX_PREFIX_LEN], __rpcmem_t *m) {
-  int stackptr, prefixlen;
-  sscanf(inbuf, PREFIX_FMT "%n", fname, &stackptr, &prefixlen);
-  m->sp = stackptr;
-  m->hp = 0;
-  memcpy(m->data, inbuf + prefixlen, len - prefixlen);
-}
-
-#undef PREFIX_FMT
-#undef MAX_PREFIX_LEN
 
 #endif
