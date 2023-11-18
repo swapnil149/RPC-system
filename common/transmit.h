@@ -3,8 +3,8 @@
 
 #include <cstdio>
 
-#ifndef SOCKET
-#define SOCKET dummysock
+#ifndef RPCSOCKET
+#define RPCSOCKET dummysock
 static struct {
   void (*write)(const void *, int);
   void (*read)(void *, int);
@@ -24,20 +24,21 @@ static void rpc_send(const char *fname, const __rpcmem_t *mem) {
   snprintf(prefix, prefix_len, PREFIX_FMT, fname, mem->hp);
 
   int msg_len = prefix_len + mem->hp + (mem->capacity - mem->sp);
-  SOCKET->write(&msg_len, sizeof(msg_len));
-  SOCKET->write(prefix, prefix_len);
-  SOCKET->write(mem->data, mem->hp);
-  SOCKET->write(mem->data + mem->sp, mem->capacity - mem->sp);
+
+  RPCSOCKET->write(&msg_len, sizeof(msg_len)); // TODO: don't rely on endianness
+  RPCSOCKET->write(prefix, prefix_len);
+  RPCSOCKET->write(mem->data, mem->hp);
+  RPCSOCKET->write(mem->data + mem->sp, mem->capacity - mem->sp);
 
   free(prefix);
 }
 
 static void rpc_recv(char *fname, __rpcmem_t *mem) {
   int msg_len, prefixlen;
-  SOCKET->read(&msg_len, sizeof(msg_len));
+  RPCSOCKET->read(&msg_len, sizeof(msg_len));
 
-  char *buf = (char *)malloc(msg_len);
-  SOCKET->read(buf, msg_len);
+  char *buf = (char *)malloc(msg_len); // TODO: optimize unnecessary malloc
+  RPCSOCKET->read(buf, msg_len);
 
   sscanf(buf, PREFIX_FMT "%n", fname, &mem->sp, &prefixlen);
   memcpy(mem->data, buf + prefixlen, msg_len - prefixlen);
