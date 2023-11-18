@@ -33,7 +33,7 @@ boilerplate = '''#include "common/basis.h"
 basis_types = ["int", "float", "bool", "string", "rpcptr_t"]
 
 
-def load_includes(include: str):
+def expand_includes(include: str):
     files_to_include = re.findall(r'#include "([\w\./]+)"', include)
     contents = []
     for filename in files_to_include:
