@@ -26,8 +26,8 @@ using namespace std;"""
 proxyhelper = "#include \"rpcproxyhelper.h\""
 stubhelper = "#include \"rpcstubhelper.h\""
 
-boilerplate = '''#include "common/basis.h"
-#include "common/mem.h"
+boilerplate = '''#include "common/mem.h"
+#include "common/basis.h"
 #include "common/transmit.h"'''
 
 basis_types = ["int", "float", "bool", "string", "rpcptr_t"]
@@ -39,7 +39,8 @@ def expand_includes(include: str):
     for filename in files_to_include:
         with open(filename, "r") as f:
             contents.append(f.read())
-    return '\n'.join(contents)
+    contents = '\n'.join(contents)
+    return re.sub(r'#include ".*"\s*\n', '', contents)
 
 
 def check_usage(args):
@@ -74,7 +75,7 @@ def gen_proxy_boilerplate() -> str:
     return '\n'.join([
         proxyhelper,
         socket,
-        boilerplate
+        expand_includes(boilerplate)
     ])
 
 
@@ -83,7 +84,7 @@ def gen_stub_boilerplate() -> str:
     return '\n'.join([
         stubhelper,
         socket,
-        boilerplate
+        expand_includes(boilerplate)
     ])
 
 

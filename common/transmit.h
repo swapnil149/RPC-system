@@ -14,8 +14,6 @@ static struct {
 } *dummysock;
 #endif
 
-// #include "c150debug.h"
-// #include "c150streamsocket.h"
 #include "basis.h"
 #include "mem.h"
 #include <stdio.h>
@@ -23,6 +21,7 @@ static struct {
 static void rpc_send(string fname, __rpcmem_t *mem) {
   __pack_string(fname, mem);
   int mem_size = mem->hp + (mem->capacity - mem->sp);
+  char correct_endianness[4];
   RPCSOCKET->write(&mem_size,
                    sizeof(mem_size));          // TODO: don't rely on endianness
   RPCSOCKET->write(&mem->hp, sizeof(mem->hp)); // TODO: don't rely on endianness
