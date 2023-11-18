@@ -8,14 +8,16 @@ from textwrap import indent
 
 IDL_TO_JSON_EXECUTABLE = './samples/idl_to_json'
 
-ITER = "i"
 
 TAB = '\t'
 
+# Special variable names
+ITER = "__i"
 RPCMEM_T = "__rpcmem_t"
 MEM = "mem"
 PACK = "__pack"
 UNPACK = "__unpack"
+SOCKET = "RPCSOCKET"
 
 includes = """#include <stdio.h>
 #include <string>
@@ -56,7 +58,7 @@ def read_idl_to_json(filename) -> dict:
 
 
 def gen_proxy_boilerplate() -> str:
-    socket = "#define SOCKET (*RPCPROXYSOCKET)"
+    socket = f"#define {SOCKET} (*RPCPROXYSOCKET)"
     return '\n'.join([
         basis_types_boilerplate,
         mem_boilerplate,
@@ -66,7 +68,7 @@ def gen_proxy_boilerplate() -> str:
 
 
 def gen_stub_boilerplate() -> str:
-    socket = "#define SOCKET (*RPCSTUBSOCKET)"
+    socket = f"#define {SOCKET} (*RPCSTUBSOCKET)"
     return '\n'.join([
         basis_types_boilerplate,
         mem_boilerplate,
@@ -239,7 +241,7 @@ def write_stub(stub_code: str, idl_filename: str):
 def main():
     idl_filename = check_usage(sys.argv)
     idl_json = read_idl_to_json(idl_filename)
-    with open(idl_filename.removesuffix(".idl") + ".json", "r") as f:
+    with open(re.sub(r'\.idl', '.json', idl_filename), "r") as f:
         idl_json = json.load(f)
     idl_include = f"#include \"{idl_filename}\""
 
