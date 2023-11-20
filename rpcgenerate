@@ -8,7 +8,7 @@ from textwrap import indent
 
 IDL_TO_JSON_EXECUTABLE = './samples/idl_to_json'
 
-TAB = '\t'
+TAB = '    '
 
 # Special variable names
 ITER = "__i"
@@ -100,7 +100,6 @@ def get_idl_function_declarations(idl_json: dict) -> dict:
 def gen_pack(var, typ, packers, dims=None) -> str:
     if not typ in packers and not typ in basis_types:
         raise RuntimeError(f"Type {typ} not previously declared")
-
     if dims:
         multiindex = "".join(["[0]" for _ in dims[1:]]) + f"[{ITER}]"
         return f"""for (int {ITER} = 0; {ITER} < {sumexp(dims)}; {ITER}++) {{
@@ -139,7 +138,7 @@ def gen_packing_stmts(vars, types, packers, n_indents=0) -> str:
     for var, typ in zip(vars, types):
         inner_typ, dims = inner_type_and_dims(typ)
         pack_stmts.append(gen_pack(var, inner_typ, packers, dims))
-    return indent('\n'.join(pack_stmts), '\t' * n_indents)
+    return indent('\n'.join(pack_stmts), TAB)
 
 
 def gen_unpacking_stmts(vars, types, unpackers, n_indents=0) -> str:
@@ -147,7 +146,7 @@ def gen_unpacking_stmts(vars, types, unpackers, n_indents=0) -> str:
     for var, typ in zip(reversed(vars), reversed(types)):
         inner_typ, dims = inner_type_and_dims(typ)
         unpack_stmts.append(gen_unpack(var, inner_typ, unpackers, dims))
-    return indent('\n'.join(unpack_stmts), '\t' * n_indents)
+    return indent('\n'.join(unpack_stmts), TAB)
 
 
 def gen_struct_packer(struct_name: str, struct_def: dict, packers: dict) -> str:
@@ -157,7 +156,7 @@ def gen_struct_packer(struct_name: str, struct_def: dict, packers: dict) -> str:
     struct_memtypes = [member["type"] for member in struct_def["members"]]
     packer_def = f"""
 void {PACK}_{struct_name}({struct_name} {struct_var}, {RPCMEM_T} *{MEM}) {{
-{gen_packing_stmts(struct_members, struct_memtypes, packers, 2)}
+{gen_packing_stmts(struct_members, struct_memtypes, packers, 1)}
 }}"""
     return packer_def
 
@@ -196,7 +195,7 @@ def gen_proxy_def(function_name: str, func_decl: dict, packers: dict, unpackers:
     return f"""{return_type} {function_name}({params}) {{
     {RPCMEM_T} *{MEM} = rpcmem_new();
 
-{gen_packing_stmts(argnames, argtys, packers, 2)}
+{gen_packing_stmts(argnames, argtys, packers, 1)}
 
     rpc_send(\"{function_name}\", {MEM});
     rpc_recv({MEM});
@@ -224,7 +223,7 @@ def gen_stub_def(function_name: str, func_decl: dict, packers: dict, unpackers: 
         save_result = f"{return_type} {result_var} = "
 
     return f"""void __{function_name}({RPCMEM_T} *{MEM}) {{
-{indent(arg_declarations, TAB * 2)}
+{indent(arg_declarations, TAB)}
 {gen_unpacking_stmts(argnames, argtys, unpackers, 2)}
     {save_result}{function_name}({", ".join(argnames)});
     {MEM}->hp = 0;

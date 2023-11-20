@@ -1,2 +1,6 @@
 *.o
 regressions
+.clang-format
+
+*.proxy.cpp
+*.stub.cpp
