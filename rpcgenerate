@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import subprocess
 import json
 import sys
@@ -8,7 +9,8 @@ from textwrap import indent
 
 IDL_TO_JSON_EXECUTABLE = './samples/idl_to_json'
 
-TAB = '    '
+# use 4 spaces for tab
+TAB = ' ' * 4
 
 # Special variable names
 ITER = "__i"
@@ -19,6 +21,7 @@ UNPACK = "__unpack"
 SOCKET = "RPCSOCKET"
 
 # includes
+
 includes = """#include <stdio.h>
 #include <string>
 using namespace std;"""
@@ -133,7 +136,7 @@ def sumexp(nums: list[int]):
     return " * ".join([str(n) for n in nums])
 
 
-def gen_packing_stmts(vars, types, packers, n_indents=0) -> str:
+def gen_packing_stmts(vars, types, packers) -> str:
     pack_stmts = []
     for var, typ in zip(vars, types):
         inner_typ, dims = inner_type_and_dims(typ)
@@ -141,7 +144,7 @@ def gen_packing_stmts(vars, types, packers, n_indents=0) -> str:
     return indent('\n'.join(pack_stmts), TAB)
 
 
-def gen_unpacking_stmts(vars, types, unpackers, n_indents=0) -> str:
+def gen_unpacking_stmts(vars, types, unpackers) -> str:
     unpack_stmts = []
     for var, typ in zip(reversed(vars), reversed(types)):
         inner_typ, dims = inner_type_and_dims(typ)
@@ -156,7 +159,7 @@ def gen_struct_packer(struct_name: str, struct_def: dict, packers: dict) -> str:
     struct_memtypes = [member["type"] for member in struct_def["members"]]
     packer_def = f"""
 void {PACK}_{struct_name}({struct_name} {struct_var}, {RPCMEM_T} *{MEM}) {{
-{gen_packing_stmts(struct_members, struct_memtypes, packers, 1)}
+{gen_packing_stmts(struct_members, struct_memtypes, packers)}
 }}"""
     return packer_def
 
@@ -169,7 +172,7 @@ def gen_struct_unpacker(struct_name: str, struct_def: dict, unpackers: dict) -> 
     unpacker_code = f"""
 {struct_name} {UNPACK}_{struct_name}({RPCMEM_T} *{MEM}) {{
     {struct_name} {result_var};
-{gen_unpacking_stmts(result_members, result_memtypes, unpackers, 2)}
+{gen_unpacking_stmts(result_members, result_memtypes, unpackers)}
     return {result_var};
 }}"""
     return unpacker_code
@@ -195,7 +198,7 @@ def gen_proxy_def(function_name: str, func_decl: dict, packers: dict, unpackers:
     return f"""{return_type} {function_name}({params}) {{
     {RPCMEM_T} *{MEM} = rpcmem_new();
 
-{gen_packing_stmts(argnames, argtys, packers, 1)}
+{gen_packing_stmts(argnames, argtys, packers)}
 
     rpc_send(\"{function_name}\", {MEM});
     rpc_recv({MEM});
@@ -224,7 +227,7 @@ def gen_stub_def(function_name: str, func_decl: dict, packers: dict, unpackers: 
 
     return f"""void __{function_name}({RPCMEM_T} *{MEM}) {{
 {indent(arg_declarations, TAB)}
-{gen_unpacking_stmts(argnames, argtys, unpackers, 2)}
+{gen_unpacking_stmts(argnames, argtys, unpackers)}
     {save_result}{function_name}({", ".join(argnames)});
     {MEM}->hp = 0;
     {MEM}->sp = {MEM}->capacity;
@@ -234,7 +237,11 @@ def gen_stub_def(function_name: str, func_decl: dict, packers: dict, unpackers: 
 
 
 def gen_stub_dispatcher(func_decls: dict) -> str:
-    return f"""// dispatcher"""
+    return f"""// dispatcher
+void dispatchFunction() {{
+    return;
+}}
+"""
 
 
 def write_proxy(proxy_code: str, idl_filename: str):
@@ -260,7 +267,6 @@ def main():
     struct_defs = get_idl_struct_definitions(idl_json)  # python objects
     func_decls = get_idl_function_declarations(idl_json)  # python objects
 
-    # TBD what these actually contain
     packers = {}
     unpackers = {}
     for name, struct_def in reversed(struct_defs.items()):
