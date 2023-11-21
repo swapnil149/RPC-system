@@ -8,6 +8,8 @@ using namespace std;
 int rpc_main(int argc, char **argv) {
     (void)argc, (void)argv;
 
+    MADEIT;
+
     int nums[8][8][8][8];
     People ppl;
 

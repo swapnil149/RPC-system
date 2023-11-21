@@ -4,6 +4,6 @@
 
 #define DEBUG(fmt, var) fprintf(stderr, #var ": " fmt "\n", var)
 
-#define MADEIT fprintf(stderr, "Made it to %s in %s\n", __LINE__, __FILE__)
+#define MADEIT fprintf(stderr, "Made it to %d in %s\n", __LINE__, __FILE__)
 
 #endif
