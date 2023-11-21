@@ -33,7 +33,7 @@ boilerplate = '''#include "common/mem.h"
 #include "common/basis.h"
 #include "common/transmit.h"'''
 
-basis_types = ["int", "float", "bool", "string", "rpcptr_t"]
+basis_types = ["int", "float", "bool", "string", "rpcptr_t", "void"]
 
 
 def expand_includes(include: str):
@@ -53,32 +53,12 @@ def check_usage(args):
     return args[1]
 
 
-def read_idl_to_json(filename) -> dict:
-    return {}  # temporarily skip for local development
-    try:
-        assert len(sys.argv) == 2, "Wrong number of arguments"
-        assert os.path.isfile(
-            filename), f"Path {filename} does not designate a file"
-        assert os.access(filename, os.R_OK), f"File {filename} is not readable"
-        assert os.path.isfile(
-            IDL_TO_JSON_EXECUTABLE), f"Path {IDL_TO_JSON_EXECUTABLE} does not designate a file...run \"make\" to create it"
-        assert os.access(IDL_TO_JSON_EXECUTABLE,
-                         os.X_OK), f"File {IDL_TO_JSON_EXECUTABLE} exists but is not executable"
-        decls = json.loads(subprocess.check_output(
-            [IDL_TO_JSON_EXECUTABLE, filename]))
-        return decls
-    except Exception as e:
-        print(str(e), file=sys.stderr)
-        print(f"Usage: {sys.argv[0]} <idlfilename>", file=sys.stderr)
-        exit(1)
-
-
 def gen_proxy_boilerplate() -> str:
     socket = f"#define {SOCKET} RPCPROXYSOCKET"
     return '\n'.join([
         proxyhelper,
         socket,
-        expand_includes(boilerplate)
+        boilerplate
     ])
 
 
@@ -87,7 +67,7 @@ def gen_stub_boilerplate() -> str:
     return '\n'.join([
         stubhelper,
         socket,
-        expand_includes(boilerplate)
+        boilerplate
     ])
 
 
@@ -254,11 +234,17 @@ def gen_stub_dispatcher(func_decls: dict) -> str:
 void dispatchFunction() {{
     {RPCMEM_T} * {MEM} = rpcmem_new();
     string fname = rpc_recv({MEM});
+
+    MADEIT;
+
     {indent(match_and_invoke_stub_methods(func_decls), TAB)}
+    MADEIT;
     {MEM}->sp = {MEM}->capacity;
     {MEM}->hp = 0;
     fname = "BAD";
+    MADEIT;
 respond:
+    MADEIT;
     rpc_send(fname, {MEM});
     rpcmem_free(&{MEM});
 }}
@@ -277,7 +263,7 @@ def write_stub(stub_code: str, idl_filename: str):
 
 def main():
     idl_filename = check_usage(sys.argv)
-    idl_json = read_idl_to_json(idl_filename)
+    idl_json = {}
     with open(re.sub(r'\.idl', '.json', idl_filename), "r") as f:
         idl_json = json.load(f)
     idl_include = f"#include \"{idl_filename}\""
