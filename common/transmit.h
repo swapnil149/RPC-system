@@ -19,12 +19,14 @@ static struct {
 #include <stdio.h>
 #include <stdlib.h>
 
-static void rpc_send(string fname, __rpcmem_t *mem) {
-    ERP("STARTING RPC SEND: %s\n <-- FNAME", fname.c_str());
-    MADEIT;
+static void rpc_send(string _fname, __rpcmem_t *mem) {
+    string fname = string(_fname.c_str());
+    ERP("STARTING RPC SEND: %s <-- sent\n", fname.c_str());
+    DEBUG("%d", mem->hp);
+    DEBUG("%ld", fname.length());
     __pack_string(fname, mem);
-    MADEIT;
-    int mem_size = mem->hp + (mem->capacity - mem->sp);
+    DEBUG("%d", mem->hp);
+    int mem_size = mem->hp + ((mem->capacity) - mem->sp);
 
     DEBUG("%d", mem_size);
     DEBUGMEM(mem);
@@ -33,7 +35,7 @@ static void rpc_send(string fname, __rpcmem_t *mem) {
     RPCSOCKET->write((char *)&mem_size, sizeof(mem_size));
     RPCSOCKET->write((char *)&mem->hp, sizeof(mem->hp));
     RPCSOCKET->write(mem->data, mem->hp);
-    RPCSOCKET->write(mem->data + mem->sp, mem->capacity - mem->sp);
+    RPCSOCKET->write(mem->data + mem->sp, (mem->capacity) - mem->sp);
     ERP("FINISHED SEND\n");
 }
 
@@ -49,7 +51,7 @@ static string rpc_recv(__rpcmem_t *mem) {
     DEBUGMEM(mem);
 
     string fname = __unpack_string(mem);
-    ERP("FINISHING RPC RECEIVE %s\n", fname.c_str());
+    ERP("FINISHING RPC RECEIVE, %s <-- received\n", fname.c_str());
     return fname;
 }
 

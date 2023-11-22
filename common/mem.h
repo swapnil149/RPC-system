@@ -19,10 +19,12 @@ struct __rpcmem_t {
 
 static __rpcmem_t *rpcmem_new() {
     __rpcmem_t *m = (__rpcmem_t *)malloc(sizeof(*m));
+    assert(m);
     m->hp = 0;
     m->sp = INITIAL_CAPACITY;
     m->capacity = INITIAL_CAPACITY;
-    m->data = (char *)malloc(m->capacity);
+    m->data = (char *)malloc(m->capacity + 1);
+    assert(m->data);
     return m;
 }
 

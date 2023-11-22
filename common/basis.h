@@ -1,7 +1,9 @@
 #ifndef BASIS_H
 #define BASIS_H
 
+#include "../debugmacros.h"
 #include "mem.h"
+#include <cstring>
 #include <string>
 
 using namespace std;
@@ -30,13 +32,15 @@ static void __pack_float(float f, __rpcmem_t *m) {
 }
 
 static void __pack_string(string s, __rpcmem_t *m) {
-    __pack_int(s.length(), m); // Pack the length of the string
-    __rpcptr_t strPtr = m->hp; // Get the current heap pointer
+    __rpcptr_t str_ptr = m->hp; // Get the current heap pointer
+    DEBUG("%d", str_ptr);
+    DEBUG("%d", (int)s.length());
+    __pack_rpcptr(str_ptr, m); // Pack the pointer to the string on the heap
+    __pack_int((int)s.length(), m); // Pack the length of the string
     for (char c : s) {
         m->data[m->hp++] = c; // Pack each character to the heap
     }
     m->data[m->hp++] = '\0';
-    __pack_rpcptr(strPtr, m); // Pack the pointer to the string on the heap
 }
 
 //
@@ -60,12 +64,14 @@ static float __unpack_float(__rpcmem_t *m) {
 }
 
 static string __unpack_string(__rpcmem_t *m) {
-    __rpcptr_t strPtr =
-        __unpack_rpcptr(m);    // Unpack the pointer to the string on the heap
+    // Unpack the pointer to the string on the heap
     int len = __unpack_int(m); // Unpack the length of the string
+    __rpcptr_t str_ptr = __unpack_rpcptr(m);
+    DEBUG("%d", len);
+    DEBUG("%d", str_ptr);
     string result = "";
     for (int i = 0; i < len; ++i) {
-        result += m->data[strPtr + i]; // Unpack each character from the heap
+        result += m->data[str_ptr + i]; // Unpack each character from the heap
     }
     result += '\0';
     return result;

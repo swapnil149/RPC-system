@@ -2,10 +2,11 @@
 #define DEBUGMACROS_H
 #include <stdio.h>
 
-#define DEBUG(fmt, var) fprintf(stderr, #var ": " fmt "\n", var)
+#define DEBUG(fmt, var)                                                        \
+    fprintf(stderr, "%d::%s " #var ": " fmt "\n", __LINE__, __FILE__, var)
 #define ERP(...) fprintf(stderr, __VA_ARGS__)
-#define MADEIT fprintf(stderr, "Made it to %d in %s\n", __LINE__, __FILE__)
+#define MADEIT fprintf(stderr, "%d::%s\n", __LINE__, __FILE__)
 #define DEBUGMEM(m)                                                            \
-    fprintf(stderr, "HEAP: %d, STACK: %d, SIZE: %d at %d::%s\n", m->hp, m->sp, \
-            m->hp + (m->capacity - m->sp), __LINE__, __FILE__)
+    fprintf(stderr, "%d::%s HEAP: %d, STACK: %d, SIZE: %d\n", __LINE__,        \
+            __FILE__, m->hp, m->sp, m->hp + ((m->capacity) - m->sp))
 #endif
