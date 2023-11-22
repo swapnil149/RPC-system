@@ -9,7 +9,7 @@ using namespace std;
 #define RPCSOCKET dummysock
 static struct {
     void (*write)(const char *, int);
-    void (*read)(char *, int);
+    ssize_t (*read)(char *, int);
 } *dummysock;
 #endif
 
@@ -19,8 +19,12 @@ static struct {
 #include <stdio.h>
 #include <stdlib.h>
 
-static void rpc_send(string _fname, __rpcmem_t *mem) {
-    string fname = string(_fname.c_str());
+static inline void force_read(char *buf, int len) {
+    for (int n_read = 0; n_read < len;)
+        n_read += RPCSOCKET->read(buf + n_read, len - n_read);
+}
+
+static void rpc_send(string fname, __rpcmem_t *mem) {
     ERP("STARTING RPC SEND: %s <-- sent\n", fname.c_str());
     DEBUG("%d", mem->hp);
     DEBUG("%ld", fname.length());
@@ -32,30 +36,25 @@ static void rpc_send(string _fname, __rpcmem_t *mem) {
     DEBUG("%d", mem_size);
     DEBUGMEM(mem);
 
-    // TODO: don't rely on endianness
     RPCSOCKET->write((char *)&mem_size, sizeof(mem_size));
     RPCSOCKET->write((char *)&mem->hp, sizeof(mem->hp));
-    char *tmp = (char *)malloc(mem_size);
-    memcpy(tmp, mem->data, mem->hp);
-    memcpy(tmp + mem->hp, mem->data + mem->sp, stack_size);
+    RPCSOCKET->write(mem->data, mem->hp);
+    RPCSOCKET->write(mem->data + mem->sp, stack_size);
 
-    RPCSOCKET->write(tmp, mem_size);
-    // RPCSOCKET->write(mem->data + mem->sp, stack_size);
-
-    DEBUGBUF(tmp, 0, mem_size);
-    // DEBUGBUF((mem->data + mem->sp), 0, stack_size);
+    DEBUGBUF(mem->data, 0, mem->hp);
+    DEBUGBUF((mem->data + mem->sp), 0, stack_size);
 
     ERP("FINISHED SEND\n");
-    free(tmp);
 }
 
 static string rpc_recv(__rpcmem_t *mem) {
     ERP("STARTING RPC RECEIVE\n");
     int mem_size;
-    RPCSOCKET->read((char *)&mem_size, sizeof(mem_size));
-    RPCSOCKET->read((char *)&mem->sp, sizeof(mem->sp));
-    RPCSOCKET->read(mem->data, mem_size);
-    mem->hp = 0;
+    force_read((char *)&mem_size, sizeof(mem_size));
+    force_read((char *)&mem->hp, sizeof(mem->hp));
+    force_read(mem->data, mem->hp);
+    force_read(mem->data + mem->hp, mem_size - mem->hp);
+    mem->sp = mem->hp;
 
     DEBUG("%d", mem_size);
     DEBUGMEM(mem);

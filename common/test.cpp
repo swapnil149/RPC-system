@@ -14,7 +14,7 @@ int main() {
     // Create a sample data structure
     __rpcmem_t *mem = rpcmem_new();
     string originalString = "Hello, World!";
-    int originalInt = 42;
+    int originalInt = 0x12345678;
     float originalFloat = 3.14;
     bool originalBool = true;
 
@@ -30,8 +30,15 @@ int main() {
         __pack_string(ss[i], mem);
 
     // compress the data
+    DEBUG("%d", mem->capacity - mem->sp);
+    DEBUG("%d", mem->capacity);
+    DEBUG("%d", mem->sp);
+    DEBUG("%d", originalInt);
+    // DEBUGBUF(mem->data, mem->sp, mem->capacity);
+    int mem_size = mem->hp + (mem->capacity - mem->sp);
     memmove(mem->data + mem->hp, mem->data + mem->sp, mem->capacity - mem->sp);
     mem->sp = mem->hp;
+    DEBUGBUF(mem->data, 0, mem_size);
 
     // Unpack the data
     string unpackedss[3];
@@ -43,13 +50,13 @@ int main() {
     float unpackedFloat = __unpack_float(mem);
     int unpackedInt = __unpack_int(mem);
 
-    // Display the unpacked data
+    // // Display the unpacked data
     cout << "Unpacked String[0]: " << unpackedss[0] << endl;
     cout << "Unpacked String[1]: " << unpackedss[1] << endl;
     cout << "Unpacked String: " << unpackedString << endl;
-    cout << "Unpacked Int: " << unpackedInt << endl;
     cout << "Unpacked Float: " << unpackedFloat << endl;
     cout << "Unpacked Bool: " << unpackedBool << endl;
+    cout << "Unpacked Int: " << unpackedInt << endl;
 
     // Clean up
     rpcmem_free(&mem);
