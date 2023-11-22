@@ -13,16 +13,16 @@ int rpc_main(int argc, char *argv[]) {
     //
     // Call (possibly remote) func2
     //
-    // printf("Calling func2()\n");
-    // func2(); // remote call (we hope!)
-    // printf("Returned from func2()\n");
+    printf("Calling func2()\n");
+    func2(); // remote call (we hope!)
+    printf("Returned from func2()\n");
 
     //
     // Call (possibly remote) func3
     //
-    // printf("Calling func3()\n");
-    // func3(); // remote call (we hope!)
-    // printf("Returned from func3()\n");
+    printf("Calling func3()\n");
+    func3(); // remote call (we hope!)
+    printf("Returned from func3()\n");
 
     return 0;
 }

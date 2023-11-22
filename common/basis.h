@@ -15,7 +15,7 @@ using namespace std;
 //
 
 static void __pack_int(unsigned x, __rpcmem_t *m) {
-    for (int i = 0; i < sizeof(x); i++)
+    for (int i = 0; i < 4; i++)
         m->data[--m->sp] = (unsigned char)(x >> 8 * i);
 }
 
@@ -31,9 +31,6 @@ static void __pack_string(string s, __rpcmem_t *m) {
     __rpcptr_t strptr = m->hp; // Get the current heap pointer
     int strlen = (int)s.length() + 1;
     const char *strdata = s.c_str();
-    DEBUG("pack %d", strptr);
-    DEBUG("pack %d", strlen);
-    DEBUG("pack %s", strdata);
     __pack_int(strlen, m);    // Pack the length of the string
     __pack_rpcptr(strptr, m); // Pack the pointer to the string on the heap
     strncpy(m->data + m->hp, strdata, strlen);
@@ -67,9 +64,6 @@ static string __unpack_string(__rpcmem_t *m) {
     int strlen = __unpack_int(m);
     char *strdata = (char *)malloc(strlen);
     strncpy(strdata, m->data + strptr, strlen);
-    DEBUG("unpack %d", strptr);
-    DEBUG("unpack %d", strlen);
-    DEBUG("unpack %s", strdata);
     string result = string(strdata);
     free(strdata);
     return result;
