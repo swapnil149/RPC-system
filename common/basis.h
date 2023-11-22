@@ -35,6 +35,7 @@ static void __pack_string(string s, __rpcmem_t *m) {
     for (char c : s) {
         m->data[m->hp++] = c; // Pack each character to the heap
     }
+    m->data[m->hp++] = '\0';
     __pack_rpcptr(strPtr, m); // Pack the pointer to the string on the heap
 }
 
@@ -66,6 +67,7 @@ static string __unpack_string(__rpcmem_t *m) {
     for (int i = 0; i < len; ++i) {
         result += m->data[strPtr + i]; // Unpack each character from the heap
     }
+    result += '\0';
     return result;
 }
 

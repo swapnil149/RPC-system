@@ -82,16 +82,24 @@ pingstreamserver: pingstreamserver.o  $(C150AR) $(C150IDSRPCAR)  $(INCLUDES)
 #
 ########################################################################
 
-simplefunctionclient: simplefunctionclient.o rpcproxyhelper.o simplefunction.proxy.o  $(C150AR) $(C150IDSRPCAR)  $(INCLUDES)
-	$(CPP) -o simplefunctionclient simplefunctionclient.o rpcproxyhelper.o simplefunction.proxy.o  $(C150AR) $(C150IDSRPCAR) 
+# simplefunctionclient: simplefunctionclient.o rpcproxyhelper.o simplefunction.proxy.o  $(C150AR) $(C150IDSRPCAR)  $(INCLUDES)
+# 	$(CPP) -o simplefunctionclient simplefunctionclient.o rpcproxyhelper.o simplefunction.proxy.o  $(C150AR) $(C150IDSRPCAR) 
 
 # The following is NOT a mistake. The main program for any of the rpc servers
 # is rpcserver.o.  This way, we can make a different one for each set 
 # of functions, by linking the right specific stugs (in this case
 # simplefunction.stub.o)
-simplefunctionserver: simplefunction.stub.o rpcserver.o rpcstubhelper.o simplefunction.o  $(C150AR) $(C150IDSRPCAR)  $(INCLUDES)
-	$(CPP) -o simplefunctionserver rpcserver.o simplefunction.stub.o simplefunction.o rpcstubhelper.o $(C150AR) $(C150IDSRPCAR) 
+# simplefunctionserver: simplefunction.stub.o rpcserver.o rpcstubhelper.o simplefunction.o  $(C150AR) $(C150IDSRPCAR)  $(INCLUDES)
+# 	$(CPP) -o simplefunctionserver rpcserver.o simplefunction.stub.o simplefunction.o rpcstubhelper.o $(C150AR) $(C150IDSRPCAR) 
+#
+USR = jzimme04
+REMOTEPATH = ~/distributed_systems/
+.PHONY: syncup syndown
+syncup:
+	rsync -r ../RPC-system $(USR)@homework.cs.tufts.edu:$(REMOTEPATH)
 
+%.pull: 
+	rsync $(USR)@homework.cs.tufts.edu:$(REMOTEPATH)/RPC-system/$(basename $@) .
 
 ########################################################################
 #
@@ -220,11 +228,8 @@ idl_to_json: idl_to_json.o $(C150AR) $(C150IDSRPCAR)  $(INCLUDES)
 	$(CPP) -c $(CPPFLAGS) $(RPCGENFLAGS) $<
 
 # make .o from .cpp
-
 %.o:%.cpp  $(INCLUDES)
 	$(CPP) -c  $(CPPFLAGS) $< 
-
-
 
 # clean up everything we build dynamically (probably missing .cpps from .idl)
 clean:

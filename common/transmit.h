@@ -17,56 +17,39 @@ static struct {
 #include "basis.h"
 #include "mem.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 static void rpc_send(string fname, __rpcmem_t *mem) {
-    ERP("SENDING RPC\n");
+    ERP("STARTING RPC SEND: %s\n <-- FNAME", fname.c_str());
+    MADEIT;
     __pack_string(fname, mem);
+    MADEIT;
     int mem_size = mem->hp + (mem->capacity - mem->sp);
 
-    DEBUG("%s", fname.c_str());
-    DEBUG("%d", mem->hp);
-    DEBUG("%d", mem->sp);
     DEBUG("%d", mem_size);
-
-    MADEIT;
+    DEBUGMEM(mem);
 
     // TODO: don't rely on endianness
     RPCSOCKET->write((char *)&mem_size, sizeof(mem_size));
-
-    MADEIT;
-
     RPCSOCKET->write((char *)&mem->hp, sizeof(mem->hp));
-
-    MADEIT;
-
     RPCSOCKET->write(mem->data, mem->hp);
-
-    MADEIT;
-
     RPCSOCKET->write(mem->data + mem->sp, mem->capacity - mem->sp);
-
-    MADEIT;
+    ERP("FINISHED SEND\n");
 }
 
 static string rpc_recv(__rpcmem_t *mem) {
     ERP("STARTING RPC RECEIVE\n");
-
     int mem_size;
-    MADEIT;
     RPCSOCKET->read((char *)&mem_size, sizeof(mem_size));
-    MADEIT;
-    DEBUG("%d", mem_size);
     RPCSOCKET->read((char *)&mem->sp, sizeof(mem->sp));
-    MADEIT;
-
-    DEBUG("%d", mem->sp);
     RPCSOCKET->read(mem->data, mem_size);
-    MADEIT;
+    mem->hp = 0;
+
+    DEBUG("%d", mem_size);
+    DEBUGMEM(mem);
+
     string fname = __unpack_string(mem);
-    ERP("RECEIVED RPC\n");
-    DEBUG("%s", fname.c_str());
-    DEBUG("%d", mem->hp);
-    DEBUG("%d", mem->sp);
+    ERP("FINISHING RPC RECEIVE %s\n", fname.c_str());
     return fname;
 }
 

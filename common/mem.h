@@ -20,7 +20,8 @@ struct __rpcmem_t {
 static __rpcmem_t *rpcmem_new() {
     __rpcmem_t *m = (__rpcmem_t *)malloc(sizeof(*m));
     m->hp = 0;
-    m->sp = m->capacity = INITIAL_CAPACITY;
+    m->sp = INITIAL_CAPACITY;
+    m->capacity = INITIAL_CAPACITY;
     m->data = (char *)malloc(m->capacity);
     return m;
 }

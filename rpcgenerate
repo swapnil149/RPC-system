@@ -47,7 +47,7 @@ def expand_includes(include: str):
 
 
 def check_usage(args):
-    if len(args) != 2:
+    if len(args) != 2 or not sys.argv[1].endswith(".idl"):
         sys.stderr.write("USAGE: ./rpcgenerate [filename.idl]")
         exit(1)
     return args[1]
@@ -83,6 +83,8 @@ def get_idl_function_declarations(idl_json: dict) -> dict:
 def gen_pack(var, typ, packers, dims=None) -> str:
     if not typ in packers and not typ in basis_types:
         raise RuntimeError(f"Type {typ} not previously declared")
+    if typ == 'void':
+        return ""
     if dims:
         multiindex = "".join(["[0]" for _ in dims[1:]]) + f"[{ITER}]"
         return f"""for (int {ITER} = 0; {ITER} < {sumexp(dims)}; {ITER}++) {{
@@ -95,6 +97,8 @@ def gen_pack(var, typ, packers, dims=None) -> str:
 def gen_unpack(var, typ, unpackers, dims=None) -> str:
     if not typ in unpackers and not typ in basis_types:
         raise RuntimeError(f"Type {typ} not previously declared")
+    if typ == 'void':
+        return ""
     if dims:
         multiindex = "".join(["[0]" for _ in dims[1:]]) + f"[{ITER} - 1]"
         return f"""for (int {ITER} = {sumexp(dims)}; {ITER} > 0; {ITER}--) {{
@@ -178,13 +182,21 @@ def gen_proxy_def(function_name: str, func_decl: dict, packers: dict, unpackers:
     return f"""{return_type} {function_name}({params}) {{
     {RPCMEM_T} *{MEM} = rpcmem_new();
 
+    ERP("PACKING %s\\n", "{function_name}");
+    DEBUGMEM({MEM});
+
 {gen_packing_stmts(argnames, argtys, packers)}
 
+    DEBUGMEM({MEM});
     rpc_send(\"{function_name}\", {MEM});
     rpc_recv({MEM});
 
+    ERP("UNPACKING retval %s\\n", "{function_name}");
+    DEBUGMEM({MEM});
+
     {unpack_result}
 
+    DEBUGMEM({MEM});
     rpcmem_free(&{MEM});
     {return_result}
 }}
@@ -207,11 +219,24 @@ def gen_stub_def(function_name: str, func_decl: dict, packers: dict, unpackers: 
 
     return f"""void __{function_name}({RPCMEM_T} *{MEM}) {{
 {indent(arg_declarations, TAB)}
+
+    ERP("UNPACKING %s\\n", "{function_name}");
+    DEBUGMEM({MEM});
+
 {gen_unpacking_stmts(argnames, argtys, unpackers)}
+
+    DEBUGMEM({MEM});
+
     {save_result}{function_name}({", ".join(argnames)});
     {MEM}->hp = 0;
     {MEM}->sp = {MEM}->capacity;
+
+    ERP("PACKING RETURNVAL %s\\n", "{function_name}");
+    DEBUGMEM({MEM});
+
     {gen_pack(result_var, return_type, packers)}
+
+    DEBUGMEM({MEM});
 }}
 """
 
@@ -220,8 +245,12 @@ def match_and_invoke_stub_methods(func_decls: dict) -> str:
     dispatcher_code = ""
     for function_name in func_decls.keys():
         dispatcher_code += f"""
-if (fname == "{function_name}") {{
+if (strcmp(fname.c_str(), "{function_name}") == 0) {{
+    ERP("%s matches %s\\n", fname.c_str(), "{function_name}");
     __{function_name}({MEM});
+    ERP("just finished exec and now: ");
+    DEBUGMEM({MEM});
+    ERP("should have just printed debugmem\\n");
     goto respond;
 }}
 """
@@ -232,19 +261,27 @@ def gen_stub_dispatcher(func_decls: dict) -> str:
     return f"""
 // Stub dispatcher
 void dispatchFunction() {{
-    {RPCMEM_T} * {MEM} = rpcmem_new();
+    {RPCMEM_T} *{MEM} = rpcmem_new();
+
+    ERP("starting recv\\n");
+
     string fname = rpc_recv({MEM});
 
-    MADEIT;
+    ERP("finished recv\\n");
+
+    DEBUGMEM({MEM});
+    DEBUG("TRYING TO MATCH %s", fname.c_str());
 
     {indent(match_and_invoke_stub_methods(func_decls), TAB)}
-    MADEIT;
+
+    ERP("didn't match any funcs\\n");
     {MEM}->sp = {MEM}->capacity;
     {MEM}->hp = 0;
     fname = "BAD";
-    MADEIT;
+
 respond:
-    MADEIT;
+    ERP("exec finished, responding \\n");
+    DEBUGMEM({MEM});
     rpc_send(fname, {MEM});
     rpcmem_free(&{MEM});
 }}
