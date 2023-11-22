@@ -26,7 +26,8 @@ static void rpc_send(string _fname, __rpcmem_t *mem) {
     DEBUG("%ld", fname.length());
     __pack_string(fname, mem);
     DEBUG("%d", mem->hp);
-    int mem_size = mem->hp + ((mem->capacity) - mem->sp);
+    int stack_size = mem->capacity - mem->sp;
+    int mem_size = mem->hp + stack_size;
 
     DEBUG("%d", mem_size);
     DEBUGMEM(mem);
@@ -34,9 +35,18 @@ static void rpc_send(string _fname, __rpcmem_t *mem) {
     // TODO: don't rely on endianness
     RPCSOCKET->write((char *)&mem_size, sizeof(mem_size));
     RPCSOCKET->write((char *)&mem->hp, sizeof(mem->hp));
-    RPCSOCKET->write(mem->data, mem->hp);
-    RPCSOCKET->write(mem->data + mem->sp, (mem->capacity) - mem->sp);
+    char *tmp = (char *)malloc(mem_size);
+    memcpy(tmp, mem->data, mem->hp);
+    memcpy(tmp + mem->hp, mem->data + mem->sp, stack_size);
+
+    RPCSOCKET->write(tmp, mem_size);
+    // RPCSOCKET->write(mem->data + mem->sp, stack_size);
+
+    DEBUGBUF(tmp, 0, mem_size);
+    // DEBUGBUF((mem->data + mem->sp), 0, stack_size);
+
     ERP("FINISHED SEND\n");
+    free(tmp);
 }
 
 static string rpc_recv(__rpcmem_t *mem) {
@@ -49,6 +59,7 @@ static string rpc_recv(__rpcmem_t *mem) {
 
     DEBUG("%d", mem_size);
     DEBUGMEM(mem);
+    DEBUGBUF(mem->data, 0, mem_size);
 
     string fname = __unpack_string(mem);
     ERP("FINISHING RPC RECEIVE, %s <-- received\n", fname.c_str());

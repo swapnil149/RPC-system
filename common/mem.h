@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define INITIAL_CAPACITY (1 << 16)
+#define INITIAL_CAPACITY ((1 << 16))
 
 typedef uint32_t __rpcptr_t;
 
@@ -21,9 +21,9 @@ static __rpcmem_t *rpcmem_new() {
     __rpcmem_t *m = (__rpcmem_t *)malloc(sizeof(*m));
     assert(m);
     m->hp = 0;
-    m->sp = INITIAL_CAPACITY;
-    m->capacity = INITIAL_CAPACITY;
-    m->data = (char *)malloc(m->capacity + 1);
+    m->sp = INITIAL_CAPACITY - 1;
+    m->capacity = INITIAL_CAPACITY - 1;
+    m->data = (char *)malloc(m->capacity);
     assert(m->data);
     return m;
 }

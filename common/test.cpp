@@ -18,26 +18,34 @@ int main() {
     float originalFloat = 3.14;
     bool originalBool = true;
 
+    string ss[3] = {"Hey", "hello", "hi"};
+
     // Pack the data
     __pack_int(originalInt, mem);
     __pack_float(originalFloat, mem);
     __pack_string(originalString, mem);
     __pack_bool(originalBool, mem);
 
-    // Display the packed data (for demonstration purposes)
-    // cout << "Packed Data: ";
-    // for (rpcptr_t i = mem->hp; i < mem->capacity; ++i) {
-    //     cout << static_cast<int>(mem->data[i]) << " ";
-    // }
-    // cout << endl;
+    for (int i = 0; i < 3; i++)
+        __pack_string(ss[i], mem);
+
+    // compress the data
+    memmove(mem->data + mem->hp, mem->data + mem->sp, mem->capacity - mem->sp);
+    mem->sp = mem->hp;
 
     // Unpack the data
+    string unpackedss[3];
+    for (int i = 3; i > 0; i--)
+        unpackedss[i - 1] = __unpack_string(mem);
+
     bool unpackedBool = __unpack_bool(mem);
     string unpackedString = __unpack_string(mem);
     float unpackedFloat = __unpack_float(mem);
     int unpackedInt = __unpack_int(mem);
 
     // Display the unpacked data
+    cout << "Unpacked String[0]: " << unpackedss[0] << endl;
+    cout << "Unpacked String[1]: " << unpackedss[1] << endl;
     cout << "Unpacked String: " << unpackedString << endl;
     cout << "Unpacked Int: " << unpackedInt << endl;
     cout << "Unpacked Float: " << unpackedFloat << endl;

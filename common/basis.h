@@ -3,10 +3,13 @@
 
 #include "../debugmacros.h"
 #include "mem.h"
-#include <cstring>
+#include <string.h>
 #include <string>
 
 using namespace std;
+
+static __rpcptr_t __unpack_rpcptr(__rpcmem_t *mem);
+static int __unpack_int(__rpcmem_t *mem);
 
 //
 // PACK
@@ -32,15 +35,23 @@ static void __pack_float(float f, __rpcmem_t *m) {
 }
 
 static void __pack_string(string s, __rpcmem_t *m) {
-    __rpcptr_t str_ptr = m->hp; // Get the current heap pointer
-    DEBUG("%d", str_ptr);
-    DEBUG("%d", (int)s.length());
-    __pack_rpcptr(str_ptr, m); // Pack the pointer to the string on the heap
-    __pack_int((int)s.length(), m); // Pack the length of the string
-    for (char c : s) {
-        m->data[m->hp++] = c; // Pack each character to the heap
-    }
-    m->data[m->hp++] = '\0';
+    __rpcptr_t strptr = m->hp; // Get the current heap pointer
+    int strlen = (int)s.length() + 1;
+    const char *strdata = s.c_str();
+    DEBUG("%d", strptr);
+    DEBUG("%d", strlen);
+    DEBUG("%s", strdata);
+    __pack_int(strlen, m);    // Pack the length of the string
+    __pack_rpcptr(strptr, m); // Pack the pointer to the string on the heap
+
+    // sanity check
+    DEBUG("%d", __unpack_rpcptr(m));
+    DEBUG("%d", __unpack_int(m));
+    __pack_int(strlen, m);
+    __pack_rpcptr(strptr, m);
+
+    strncpy(m->data + m->hp, strdata, strlen);
+    m->hp += strlen;
 }
 
 //
@@ -64,16 +75,16 @@ static float __unpack_float(__rpcmem_t *m) {
 }
 
 static string __unpack_string(__rpcmem_t *m) {
-    // Unpack the pointer to the string on the heap
-    int len = __unpack_int(m); // Unpack the length of the string
-    __rpcptr_t str_ptr = __unpack_rpcptr(m);
-    DEBUG("%d", len);
-    DEBUG("%d", str_ptr);
-    string result = "";
-    for (int i = 0; i < len; ++i) {
-        result += m->data[str_ptr + i]; // Unpack each character from the heap
-    }
-    result += '\0';
+    __rpcptr_t strptr = __unpack_rpcptr(m);
+    int strlen = __unpack_int(m);
+    char *strdata = (char *)malloc(strlen);
+    strncpy(strdata, m->data + strptr, strlen);
+
+    DEBUG("%d", strptr);
+    DEBUG("%d", strlen);
+    DEBUG("%s", strdata);
+    string result = string(strdata);
+    free(strdata);
     return result;
 }
 
