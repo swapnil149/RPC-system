@@ -27,9 +27,9 @@ using namespace std;"""
 proxyhelper = "#include \"rpcproxyhelper.h\""
 stubhelper = "#include \"rpcstubhelper.h\""
 
-boilerplate = '''#include "common/mem.h"
-#include "common/basis.h"
-#include "common/transmit.h"'''
+boilerplate = '''#include "mem.h"
+#include "basis.h"
+#include "transmit.h"'''
 
 basis_types = ["int", "float", "bool", "string", "rpcptr_t", "void"]
 

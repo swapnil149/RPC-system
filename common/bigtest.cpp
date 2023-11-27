@@ -1,6 +1,7 @@
 #define INITIAL_CAPACITY 16
-#include "basis.h"
-#include "mem.h"
+#include "../basis.h"
+#include "../mem.h"
+#include "debugmacros.h"
 
 int main() {
     __rpcmem_t *mem = rpcmem_new();

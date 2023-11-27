@@ -1,4 +1,4 @@
-#include "basis.h"
+#include "../basis.h"
 #include <iostream>
 
 int main() {

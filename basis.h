@@ -1,7 +1,7 @@
 #ifndef BASIS_H
 #define BASIS_H
 
-#include "../debugmacros.h"
+#include "common/debugmacros.h"
 #include "mem.h"
 #include <string.h>
 #include <string>

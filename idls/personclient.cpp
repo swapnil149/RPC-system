@@ -2,7 +2,7 @@
 #include <string>
 using namespace std;
 
-#include "debugmacros.h"
+#include "../common/debugmacros.h"
 #include "person.idl"
 
 int rpc_main(int argc, char **argv) {

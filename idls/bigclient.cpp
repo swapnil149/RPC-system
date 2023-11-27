@@ -1,5 +1,5 @@
+#include "../common/debugmacros.h"
 #include "big.idl"
-#include "debugmacros.h"
 
 int rpc_main(int argc, char **argv) {
     int thirtytwo_k_numbers[10][10][4][10][2];
