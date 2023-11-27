@@ -34,7 +34,8 @@ boilerplate = '''#include "common/mem.h"
 basis_types = ["int", "float", "bool", "string", "rpcptr_t", "void"]
 
 
-def expand_includes(include: str):
+# expand basic C preprocessor "#include" templates in a string
+def expand_includes(include: str) -> str:
     files_to_include = re.findall(r'#include "([\w\./]+)"', include)
     contents = []
     for filename in files_to_include:
@@ -44,13 +45,14 @@ def expand_includes(include: str):
     return re.sub(r'#include ".*"\s*\n', '', contents)
 
 
-def check_usage(args):
+def check_usage(args: list[str]) -> str:
     if len(args) != 2 or not sys.argv[1].endswith(".idl"):
         sys.stderr.write("USAGE: ./rpcgenerate [filename.idl]")
         exit(1)
     return args[1]
 
 
+# gen the common code across all proxies
 def gen_proxy_boilerplate() -> str:
     socket = f"#define {SOCKET} RPCPROXYSOCKET"
     return '\n'.join([
@@ -60,6 +62,7 @@ def gen_proxy_boilerplate() -> str:
     ])
 
 
+# gen the common code across all stubs
 def gen_stub_boilerplate() -> str:
     socket = f"#define {SOCKET} RPCSTUBSOCKET"
     return '\n'.join([
@@ -69,43 +72,56 @@ def gen_stub_boilerplate() -> str:
     ])
 
 
+# gets all the key value pairs for structs
 def get_idl_struct_definitions(idl_json: dict) -> dict:
-    types = idl_json["types"]
-    return {t: v for t, v in types.items() if v['type_of_type'] == 'struct'}
+    return {t: v for t, v in idl_json["types"].items() if v['type_of_type'] == 'struct'}
 
 
+# gets all the key value pairs for functions
 def get_idl_function_declarations(idl_json: dict) -> dict:
     return idl_json["functions"]
 
 
-def gen_pack(var, typ, packers, dims=None) -> str:
-    if not typ in packers and not typ in basis_types:
-        raise RuntimeError(f"Type {typ} not previously declared")
-    if typ == 'void':
+# "x" "int" {"int" : ...} []        -> "__pack_int(x, mem);"
+# "x" "int" {"int" : ...} [3]       -> "for (int i = 0; i < 3; i++)
+#                                            __pack_int(x[i], mem);"
+# "x" "int" {"int" : ...} [3, 4, 5] -> "for (int i = 0; i < 3 * 4 * 5; i++)
+#                                            __pack_int(x[0][0][i], mem);"
+def gen_pack(var, inner_typ, packers: dict[str, str], dims=None) -> str:
+    if not inner_typ in packers and not inner_typ in basis_types:
+        raise RuntimeError(f"Type {inner_typ} not previously declared")
+    if inner_typ == 'void':
         return ""
     if dims:
         multiindex = "".join(["[0]" for _ in dims[1:]]) + f"[{ITER}]"
         return f"""for (int {ITER} = 0; {ITER} < {sumexp(dims)}; {ITER}++) {{
-    {gen_pack(var + multiindex, typ, packers)}
+    {gen_pack(var + multiindex, inner_typ, packers)}
 }}"""
     else:
-        return f"{PACK}_{typ}({var}, {MEM});"
+        return f"{PACK}_{inner_typ}({var}, {MEM});"
 
 
-def gen_unpack(var, typ, unpackers, dims=None) -> str:
-    if not typ in unpackers and not typ in basis_types:
-        raise RuntimeError(f"Type {typ} not previously declared")
-    if typ == 'void':
+# "x" "int" {"int" : ...} []        -> "x = __unpack_int(mem);"
+# "x" "int" {"int" : ...} [3]       -> "for (int i = 3; i > 0; i--)
+#                                           x[i - 1] = __unpack_int(mem);"
+# "x" "int" {"int" : ...} [3, 4, 5] -> "for (int i = 3 * 4 * 5; i > 0; i--)
+#                                           x[0][0][i - 1] = __unpack_int(mem);"
+def gen_unpack(var, inner_typ, unpackers, dims=None) -> str:
+    if not inner_typ in unpackers and not inner_typ in basis_types:
+        raise RuntimeError(f"Type {inner_typ} not previously declared")
+    if inner_typ == 'void':
         return ""
     if dims:
         multiindex = "".join(["[0]" for _ in dims[1:]]) + f"[{ITER} - 1]"
         return f"""for (int {ITER} = {sumexp(dims)}; {ITER} > 0; {ITER}--) {{
-    {gen_unpack(var + multiindex, typ, unpackers)}
+    {gen_unpack(var + multiindex, inner_typ, unpackers)}
 }}"""
     else:
-        return f"{var} = {UNPACK}_{typ}({MEM});"
+        return f"{var} = {UNPACK}_{inner_typ}({MEM});"
 
 
+# int[3][4] -> int, [3, 4]
+# int       -> int, []
 def inner_type_and_dims(raw_type: str) -> tuple[str, list[int]]:
     if raw_type.startswith('__'):
         inner_type = re.sub(r"[_\]\[\d]", "", raw_type)
@@ -114,6 +130,8 @@ def inner_type_and_dims(raw_type: str) -> tuple[str, list[int]]:
     return raw_type, []
 
 
+# [3, 4, 5] -> 3 * 4 * 5
+# [1] -> 1
 def sumexp(nums: list[int]):
     return " * ".join([str(n) for n in nums])
 
@@ -238,9 +256,11 @@ def gen_stub_dispatcher(func_decls: dict) -> str:
 void dispatchFunction() {{
     {RPCMEM_T} *{MEM} = rpcmem_new();
     string fname = rpc_recv({MEM});
-
+    if (fname == NO_RPC)
+        return;
+    
     {indent(match_and_invoke_stub_methods(func_decls), TAB)}
-
+    // no match (matches use `goto respond`)
     {MEM}->sp = {MEM}->capacity;
     {MEM}->hp = 0;
     fname = "BAD";
@@ -292,8 +312,9 @@ def main():
 
     proxy_code = '\n'.join([includes, idl_include, proxy_boilerplate,
                             packer_funcs, unpacker_funcs, proxy_funcs])
-    stub_code = '\n'.join(
-        [includes, idl_include, stub_boilerplate, packer_funcs, unpacker_funcs, stub_funcs, stub_dispatcher])
+    stub_code = '\n'.join([includes, idl_include, stub_boilerplate,
+                           packer_funcs, unpacker_funcs, stub_funcs,
+                           stub_dispatcher])
 
     write_proxy(proxy_code, idl_filename)
     write_stub(stub_code, idl_filename)

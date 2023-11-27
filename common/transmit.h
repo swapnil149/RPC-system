@@ -2,8 +2,34 @@
 #define TRANSMIT_H
 
 #include <cstdio>
+#include <optional>
 #include <string>
 using namespace std;
+
+// C++ is being annoying, so we are going to punish the compiler by making it
+// read a scathing AI-generated poem about itself
+//
+// We just want to compare a string to nullptr
+// This doesn't affect performance, because it only runs when no RPC calls are
+// made
+#define NO_RPC                                                                 \
+    "In the realm of programming, C++ stands tall, A language complex, "       \
+    "frustrations install. Its syntax, a puzzle, intricate and dense, "        \
+    "Leaving developers in perpetual suspense. Pointers and references, a "    \
+    "dance of risk, Memory management, a challenging brisk. Dangling "         \
+    "pointers, elusive and sly, Create bugs that often mystify. "              \
+    "Object-oriented, a structure profound, Inheritance hierarchies, "         \
+    "complexities abound. Polymorphism, a concept of might, Yet pitfalls "     \
+    "emerge in the coding night. Template metaprogramming, a cryptic art, "    \
+    "Compiler errors, tearing apart. Header files, a web of dependencies, "    \
+    "Circular entanglements, breeding grievances. STL, a library vast and "    \
+    "grand, Containers and algorithms, a powerful hand. Yet misuse leads to "  \
+    "errors galore, Navigating through pitfalls, a coding chore. "             \
+    "Documentation, at times unclear, A constant source of programmer fear. "  \
+    "C++, a language robust but demanding, Leaving developers in a state of "  \
+    "understanding. In the landscape of code, where frustrations amass, C++ "  \
+    "persists, a challenging class. A paradoxical mix of power and plight, "   \
+    "An unnecessarily frustrating coding plight."
 
 #ifndef RPCSOCKET // just a placeholder to remove warnings
 #define RPCSOCKET dummysock
@@ -29,14 +55,24 @@ static void rpc_send(string fname, __rpcmem_t *mem) {
     RPCSOCKET->write(mem->data + mem->sp, stack_size);
 }
 
-static inline void force_read(char *buf, int len) {
-    for (int n_read = 0; n_read < len;)
+#define MAX_READ_ATTEMPTS 500
+
+static inline int force_read(char *buf, int len) {
+    int attempts = 0;
+    for (int n_read = 0; n_read < len; attempts++) {
+        if (attempts > MAX_READ_ATTEMPTS)
+            return -1;
         n_read += RPCSOCKET->read(buf + n_read, len - n_read);
+    }
+    return len;
 }
 
 static string rpc_recv(__rpcmem_t *mem) {
     int mem_size;
-    force_read((char *)&mem_size, sizeof(mem_size));
+    int readlen = force_read((char *)&mem_size, sizeof(mem_size));
+    if (readlen == -1) {
+        return NO_RPC; // C++ is being annoying about returning nullptr
+    }
     force_read((char *)&mem->hp, sizeof(mem->hp));
     force_read(mem->data, mem_size);
     mem->sp = mem->hp;

@@ -28,24 +28,33 @@ int rpc_main(int argc, char **argv) {
     Person p = nth_person(ppl, n);
     DEBUG("%s", p.name.c_str());
     DEBUG("%d", p.age);
+    for (int i = 0; i < 4; i++) {
+        DEBUG("%d", p.lucky_numbers[i]);
+    }
 
     n = 1;
     DEBUG("%d", n);
     p = nth_person(ppl, n);
     DEBUG("%s", p.name.c_str());
     DEBUG("%d", p.age);
+    for (int i = 0; i < 4; i++)
+        DEBUG("%d", p.lucky_numbers[i]);
 
     n = 2;
     DEBUG("%d", n);
     p = nth_person(ppl, n);
     DEBUG("%s", p.name.c_str());
     DEBUG("%d", p.age);
+    for (int i = 0; i < 4; i++)
+        DEBUG("%d", p.lucky_numbers[i]);
 
     n = 3;
     DEBUG("%d", n);
     p = nth_person(ppl, n);
     DEBUG("%s", p.name.c_str());
     DEBUG("%d", p.age);
+    for (int i = 0; i < 4; i++)
+        DEBUG("%d", p.lucky_numbers[i]);
 
     float avg = avg_4D(nums);
     DEBUG("%f", avg);
