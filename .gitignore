@@ -4,3 +4,6 @@ regressions
 
 *.proxy.cpp
 *.stub.cpp
+
+*.out
+*.txt
