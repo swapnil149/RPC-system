@@ -132,10 +132,12 @@ syncup:
 
 # Compile / link any client executable: 
 %client: %.o %.proxy.o rpcclient.o rpcproxyhelper.o %client.o %.proxy.o
+	echo $@
 	$(CPP) -o $@ $@.o rpcproxyhelper.o rpcclient.o $*.proxy.o  $(C150AR) $(C150IDSRPCAR) 
 
 # Compile / link any server executable:
 %server: %.o %.stub.o rpcserver.o rpcstubhelper.o %.stub.o
+	echo $@
 	$(CPP) -o $@ rpcserver.o $*.stub.o $*.o rpcstubhelper.o $(C150AR) $(C150IDSRPCAR) 
 
 ########################################################################
