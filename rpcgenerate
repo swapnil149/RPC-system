@@ -226,20 +226,12 @@ def gen_stub_def(function_name: str, func_decl: dict, packers: dict, unpackers: 
         save_result = f"{return_type} {result_var} = "
 
     return f"""void __{function_name}({RPCMEM_T} *{MEM}) {{
-    MADEIT;
 {indent(arg_declarations, TAB)}
-    MADEIT;
 {gen_unpacking_stmts(argnames, argtys, unpackers)}
-    MADEIT;
-
     {save_result}{function_name}({", ".join(argnames)});
     {MEM}->hp = 0;
-    MADEIT;
     {MEM}->sp = {MEM}->capacity;
-
-    MADEIT;
     {gen_pack(result_var, return_type, packers)}
-    MADEIT;
 }}
 """
 
@@ -261,13 +253,12 @@ def gen_stub_dispatcher(func_decls: dict) -> str:
 // Stub dispatcher
 void dispatchFunction() {{
     {RPCMEM_T} *{MEM} = rpcmem_new();
-    MADEIT;
     string fname = rpc_recv({MEM});
-    MADEIT;
-    if (fname == NO_RPC)
+    if (fname == NO_RPC) {{
+        rpcmem_free(&{MEM});
         return;
-    
-    MADEIT;
+    }}
+
     {indent(match_and_invoke_stub_methods(func_decls), TAB)}
     // no match (matches use `goto respond`)
     {MEM}->sp = {MEM}->capacity;
@@ -275,7 +266,6 @@ void dispatchFunction() {{
     fname = "BAD";
 
 respond:
-    MADEIT;
     rpc_send(fname, {MEM});
     rpcmem_free(&{MEM});
 }}

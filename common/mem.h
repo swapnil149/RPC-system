@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define INITIAL_CAPACITY 16
+// #define INITIAL_CAPACITY 16
 #ifndef INITIAL_CAPACITY
 #define INITIAL_CAPACITY (1 << 16)
 #endif
