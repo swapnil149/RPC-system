@@ -31,6 +31,8 @@ using namespace std;
     "persists, a challenging class. A paradoxical mix of power and plight, "   \
     "An unnecessarily frustrating coding plight."
 
+#define MAX_READ_ATTEMPTS 500
+
 #ifndef RPCSOCKET // just a placeholder to remove warnings
 #define RPCSOCKET dummysock
 static struct {
@@ -45,6 +47,8 @@ static struct {
 #include <stdio.h>
 #include <stdlib.h>
 
+static inline int force_read(char *buf, int len);
+
 static void rpc_send(string fname, __rpcmem_t *mem) {
     __pack_string(fname, mem);
     int stack_size = mem->capacity - mem->sp;
@@ -53,18 +57,6 @@ static void rpc_send(string fname, __rpcmem_t *mem) {
     RPCSOCKET->write((char *)&mem->hp, sizeof(mem->hp));
     RPCSOCKET->write(mem->data, mem->hp);
     RPCSOCKET->write(mem->data + mem->sp, stack_size);
-}
-
-#define MAX_READ_ATTEMPTS 500
-
-static inline int force_read(char *buf, int len) {
-    int attempts = 0;
-    for (int n_read = 0; n_read < len; attempts++) {
-        if (attempts > MAX_READ_ATTEMPTS)
-            return -1;
-        n_read += RPCSOCKET->read(buf + n_read, len - n_read);
-    }
-    return len;
 }
 
 static string rpc_recv(__rpcmem_t *mem) {
@@ -78,6 +70,16 @@ static string rpc_recv(__rpcmem_t *mem) {
     mem->sp = mem->hp;
     string fname = __unpack_string(mem);
     return fname;
+}
+
+static inline int force_read(char *buf, int len) {
+    int attempts = 0;
+    for (int n_read = 0; n_read < len; attempts++) {
+        if (attempts > MAX_READ_ATTEMPTS)
+            return -1;
+        n_read += RPCSOCKET->read(buf + n_read, len - n_read);
+    }
+    return len;
 }
 
 #endif

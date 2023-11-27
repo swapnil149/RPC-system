@@ -1,15 +1,6 @@
 #include "basis.h"
 #include <iostream>
 
-//                 "<fname> <stackptr & heapptr>"
-#define PREFIX_FMT "%s %08x"
-
-#define MAX_FNAME_LEN 80
-#define MAX_PREFIX_LEN (MAX_FNAME_LEN + 20) // rough estimate
-
-#undef PREFIX_FMT
-#undef MAX_PREFIX_LEN
-
 int main() {
     // Create a sample data structure
     __rpcmem_t *mem = rpcmem_new();
@@ -34,11 +25,13 @@ int main() {
     DEBUG("%d", mem->capacity);
     DEBUG("%d", mem->sp);
     DEBUG("%d", originalInt);
+
     // DEBUGBUF(mem->data, mem->sp, mem->capacity);
     int mem_size = mem->hp + (mem->capacity - mem->sp);
     memmove(mem->data + mem->hp, mem->data + mem->sp, mem->capacity - mem->sp);
+
     mem->sp = mem->hp;
-    DEBUGBUF(mem->data, 0, mem_size);
+    // DEBUGBUF(mem->data, 0, mem_size);
 
     // Unpack the data
     string unpackedss[3];
