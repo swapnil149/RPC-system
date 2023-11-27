@@ -52,7 +52,7 @@ static inline int force_read(char *buf, int len);
 static void rpc_send(string fname, __rpcmem_t *mem) {
     __pack_string(fname, mem);
     int stack_size = mem->capacity - mem->sp;
-    int mem_size = mem->hp + stack_size;
+    unsigned int mem_size = mem->hp + stack_size;
     RPCSOCKET->write((char *)&mem_size, sizeof(mem_size));
     RPCSOCKET->write((char *)&mem->hp, sizeof(mem->hp));
     RPCSOCKET->write(mem->data, mem->hp);
@@ -60,7 +60,7 @@ static void rpc_send(string fname, __rpcmem_t *mem) {
 }
 
 static string rpc_recv(__rpcmem_t *mem) {
-    int incoming_mem_size;
+    unsigned int incoming_mem_size;
     int readlen =
         force_read((char *)&incoming_mem_size, sizeof(incoming_mem_size));
 

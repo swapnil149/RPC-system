@@ -12,5 +12,5 @@
 
 #define DEBUGBUF(buf, start, end)                                              \
     for (int __i = start; __i < (int)end; __i++)                               \
-        fprintf(stderr, #buf "[%02d]: %02x\n", __i, buf[__i]);
+        fprintf(stderr, #buf "[%02d]: %02x\n", __i, (char)buf[__i]);
 #endif

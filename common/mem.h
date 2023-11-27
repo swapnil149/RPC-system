@@ -1,11 +1,13 @@
 #ifndef MEM_H
 #define MEM_H
 
+#include "../debugmacros.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#define INITIAL_CAPACITY 16
 #ifndef INITIAL_CAPACITY
 #define INITIAL_CAPACITY (1 << 16)
 #endif
@@ -41,6 +43,9 @@ static void rpcmem_expand(__rpcmem_t *m) {
     m->data = (char *)realloc(m->data, m->capacity);
     memmove(m->data + m->capacity - stacksize, m->data + m->sp, stacksize);
     m->sp = m->capacity - stacksize;
+    DEBUG("EXPANDED: %d", m->capacity);
+    DEBUG("new sp: %d", m->sp);
+    DEBUG("new hp: %d", m->hp);
 }
 
 #endif

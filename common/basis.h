@@ -14,12 +14,21 @@ using namespace std;
 // pre-decrement the stack pointer
 //
 
+static inline void make_room_for(__rpcmem_t *m, int n_bytes) {
+    while (m->hp + n_bytes >= m->sp)
+        rpcmem_expand(m);
+}
+
 static void __pack_int(unsigned x, __rpcmem_t *m) {
-    for (int i = 0; i < 4; i++)
+    make_room_for(m, sizeof(x));
+    for (unsigned i = 0; i < sizeof(x); i++)
         m->data[--m->sp] = (unsigned char)(x >> 8 * i);
 }
 
-static void __pack_bool(bool b, __rpcmem_t *m) { m->data[--m->sp] = (char)b; }
+static void __pack_bool(bool b, __rpcmem_t *m) {
+    make_room_for(m, 1);
+    m->data[--m->sp] = (char)b;
+}
 
 static void __pack_rpcptr(__rpcptr_t x, __rpcmem_t *m) { __pack_int(x, m); }
 
@@ -28,8 +37,9 @@ static void __pack_float(float f, __rpcmem_t *m) {
 }
 
 static void __pack_string(string s, __rpcmem_t *m) {
-    __rpcptr_t strptr = m->hp; // Get the current heap pointer
-    int strlen = (int)s.length() + 1;
+    __rpcptr_t strptr = m->hp;        // Get the current heap pointer
+    int strlen = (int)s.length() + 1; // Includes null byte
+    make_room_for(m, strlen + sizeof(strlen) + sizeof(strptr));
     const char *strdata = s.c_str();
     __pack_int(strlen, m);    // Pack the length of the string
     __pack_rpcptr(strptr, m); // Pack the pointer to the string on the heap
