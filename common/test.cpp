@@ -24,6 +24,7 @@ int main() {
     DEBUG("%d", mem->capacity - mem->sp);
     DEBUG("%d", mem->capacity);
     DEBUG("%d", mem->sp);
+
     DEBUG("%d", originalInt);
 
     // DEBUGBUF(mem->data, mem->sp, mem->capacity);

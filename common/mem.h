@@ -6,7 +6,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef INITIAL_CAPACITY
 #define INITIAL_CAPACITY (1 << 16)
+#endif
 
 typedef uint32_t __rpcptr_t;
 
@@ -38,6 +40,7 @@ static void rpcmem_expand(__rpcmem_t *m) {
     m->capacity *= 2;
     m->data = (char *)realloc(m->data, m->capacity);
     memmove(m->data + m->capacity - stacksize, m->data + m->sp, stacksize);
+    m->sp = m->capacity - stacksize;
 }
 
 #endif

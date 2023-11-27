@@ -60,13 +60,17 @@ static void rpc_send(string fname, __rpcmem_t *mem) {
 }
 
 static string rpc_recv(__rpcmem_t *mem) {
-    int mem_size;
-    int readlen = force_read((char *)&mem_size, sizeof(mem_size));
-    if (readlen == -1) {
+    int incoming_mem_size;
+    int readlen =
+        force_read((char *)&incoming_mem_size, sizeof(incoming_mem_size));
+
+    if (readlen == -1) // no read, return special bad-read code
         return NO_RPC; // C++ is being annoying about returning nullptr
-    }
+    while (mem->capacity < incoming_mem_size)
+        rpcmem_expand(mem);
+
     force_read((char *)&mem->hp, sizeof(mem->hp));
-    force_read(mem->data, mem_size);
+    force_read(mem->data, incoming_mem_size);
     mem->sp = mem->hp;
     string fname = __unpack_string(mem);
     return fname;
