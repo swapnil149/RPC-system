@@ -204,15 +204,13 @@
                         <li>The server responds by sending back the same function name with another
                         </li>
                     </ol>
-                    <p>This protocol doesn't depend on TCP/IP and actually
-                    would perform better on a UDP-based implementation.</p>
                 </li>
                 </p>
 
                 <li class="q">Did you get help from anyone other than your teammate? If "yes", then briefly explain who
                     helped you and how.</li>
                 <li class="a">
-                    Jacob enjoyed reading about the FORTH language by Chuck Moore, apparently Erlang also gives each
+                    We read about the FORTH language by Chuck Moore, apparently Erlang also gives each
                     "process" a stack and heap, so but we found that out midway
                     through.
                 </li>
@@ -230,10 +228,18 @@
             <!--         ADDITIONAL INFORMATION            -->
             <!-- * * * * * * * * * * * * * * * * * * * * * -->
 
-            <h2 id="reportbody">ADDITIONAL iNFORMATION</h2>
-
-            <p>...put any additional information you wish to supply here...</p>
-
+            <h2 id="reportbody">ADDITIONAL INFORMATION</h2>
+            <p>This protocol doesn't depend on streaming or TCP/IP and actually
+            might perform better on a UDP-based implementation. Another
+            cool idea would be to make a "data description language"
+            a.k.a. typesystem for the heap/stack structure and language
+            agnostric conversions. Then have a compiler figure out how
+            to compose these efficiently, that way you could have
+            seamless data sharing across langauges, schema versions, machines,
+            etc. An interesting attempt at this was made by the Ink and
+            Switch research lab in their project 
+            <a href="https://www.inkandswitch.com/cambria/">"Cambria"</a>.
+            </p>
         </div>
     </div>
 </body>
