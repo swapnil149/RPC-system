@@ -18,41 +18,38 @@ typedef uint32_t __rpcptr_t;
 
 struct __rpcmem_t {
     char *data;          // Pointer to the data block
-    __rpcptr_t hp;        // Heap pointer
-    __rpcptr_t sp;        // Stack pointer
-    __rpcptr_t capacity;  // Capacity of the memory block
+    __rpcptr_t hp;       // Heap pointer
+    __rpcptr_t sp;       // Stack pointer
+    __rpcptr_t capacity; // Capacity of the memory block
 };
 
 // Function to create a new RPC memory block.
 static __rpcmem_t *rpcmem_new() {
-    __rpcmem_t *m = (__rpcmem_t *)malloc(sizeof(*m));  // Allocate memory for the structure.
-    assert(m);  // Ensure that the allocation was successful. TODO: Do we need assert statements?
+    __rpcmem_t *m = (__rpcmem_t *)malloc(sizeof(*m));
+    assert(m);
     m->hp = 0;
     m->sp = m->capacity = INITIAL_CAPACITY;
-    m->data = (char *)malloc(m->capacity);  // Allocate memory for the data block.
-    assert(m->data);  // Ensure that the allocation was successful. TODO: Do we need assert statements?
+    m->data = (char *)malloc(m->capacity);
+    assert(m->data);
     return m;
 }
 
 // Function to free the memory associated with an RPC memory block.
 static void rpcmem_free(__rpcmem_t **m) {
-    free((*m)->data);  // Free the data block.
-    free(*m);          // Free the structure.
-    *m = NULL;         // Set the pointer to NULL to avoid dangling pointers.
+    free((*m)->data);
+    free(*m);
+    *m = NULL; // Set the pointer to NULL to avoid dangling pointers.
 }
 
 // Function to expand the capacity of an RPC memory block.
 static void rpcmem_expand(__rpcmem_t *m) {
-    int stacksize = m->capacity - m->sp;  // Calculate the size of the stack.
-    m->capacity *= 2;  // Double the capacity.
-    m->data = (char *)realloc(m->data, m->capacity);  // Reallocate memory for the expanded data block.
-    memmove(m->data + m->capacity - stacksize, m->data + m->sp, stacksize);  // Move the stack to the end.
-    m->sp = m->capacity - stacksize;  // Update the stack pointer.
-    
-    // Debug messages providing information about the expansion. TODO, I think we don't need them
-    DEBUG("EXPANDED: %d", m->capacity);
-    DEBUG("new sp: %d", m->sp);
-    DEBUG("new hp: %d", m->hp);
+    int stacksize = m->capacity - m->sp;
+    m->capacity *= 2;
+    m->data = (char *)realloc(m->data, m->capacity);
+    assert(m->data);
+    // Move the stack to the end of data.
+    memmove(m->data + m->capacity - stacksize, m->data + m->sp, stacksize);
+    m->sp = m->capacity - stacksize; // Update the stack pointer.
 }
 
 #endif // MEM_H

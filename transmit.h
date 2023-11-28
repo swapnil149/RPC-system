@@ -7,7 +7,7 @@
 using namespace std;
 
 // C++ is being annoying, so we are going to punish the compiler by making it
-// read a scathing AI-generated poem about itself
+// read a scathing AI-generated poem about itself. No need to read this
 //
 // We just want to compare a string to nullptr
 // This doesn't affect performance, because it only runs when no RPC calls are

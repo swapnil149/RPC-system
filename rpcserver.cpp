@@ -70,10 +70,10 @@ int main(int argc, char *argv[]) {
                 argv[0]);
         exit(1);
     }
+
     //
     //  DO THIS FIRST OR YOUR ASSIGNMENT WON'T BE GRADED!
     //
-
     GRADEME(argc, argv);
 
     //

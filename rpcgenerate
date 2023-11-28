@@ -30,6 +30,7 @@ boilerplate = '''#include "mem.h"
 #include "basis.h"
 #include "transmit.h"'''
 
+
 # Basic data types supported by the system
 basis_types = ["int", "float", "bool", "string", "rpcptr_t", "void"]
 
@@ -43,6 +44,7 @@ def expand_includes(include: str) -> str:
             contents.append(f.read())
     contents = '\n'.join(contents)
     return re.sub(r'#include ".*"\s*\n', '', contents)
+
 
 # Check command-line arguments
 def check_usage(args: list[str]) -> str:
@@ -74,7 +76,8 @@ def gen_stub_boilerplate() -> str:
 
 # gets all the key value pairs for structs from the IDL
 def get_idl_struct_definitions(idl_json: dict) -> dict:
-    return {t: v for t, v in idl_json["types"].items() if v['type_of_type'] == 'struct'}
+    return {t: v for t, v in idl_json["types"].items()
+            if v['type_of_type'] == 'struct'}
 
 
 # gets all the key value pairs for functions from the IDL
@@ -96,6 +99,7 @@ def gen_pack(var, inner_typ, packers: dict[str, str], dims=None) -> str:
     else:
         return f"{PACK}_{inner_typ}({var}, {MEM});"
 
+
 # Generate unpacking statements for a given variable and its type
 def gen_unpack(var, inner_typ, unpackers, dims=None) -> str:
     if not inner_typ in unpackers and not inner_typ in basis_types:
@@ -110,6 +114,7 @@ def gen_unpack(var, inner_typ, unpackers, dims=None) -> str:
     else:
         return f"{var} = {UNPACK}_{inner_typ}({MEM});"
 
+
 # Extract inner type and dimensions from a raw type
 def inner_type_and_dims(raw_type: str) -> tuple[str, list[int]]:
     if raw_type.startswith('__'):
@@ -123,6 +128,7 @@ def inner_type_and_dims(raw_type: str) -> tuple[str, list[int]]:
 def sumexp(nums: list[int]):
     return " * ".join([str(n) for n in nums])
 
+
 # Generate packing statements for a list of variables and their types
 def gen_packing_stmts(vars, types, packers) -> str:
     pack_stmts = []
@@ -131,6 +137,7 @@ def gen_packing_stmts(vars, types, packers) -> str:
         pack_stmts.append(gen_pack(var, inner_typ, packers, dims))
     return indent('\n'.join(pack_stmts), TAB)
 
+
 # Generate unpacking statements for a list of variables and their types
 def gen_unpacking_stmts(vars, types, unpackers) -> str:
     unpack_stmts = []
@@ -138,6 +145,7 @@ def gen_unpacking_stmts(vars, types, unpackers) -> str:
         inner_typ, dims = inner_type_and_dims(typ)
         unpack_stmts.append(gen_unpack(var, inner_typ, unpackers, dims))
     return indent('\n'.join(unpack_stmts), TAB)
+
 
 # Generate the packer function for a struct
 def gen_struct_packer(struct_name: str, struct_def: dict, packers: dict) -> str:
@@ -150,6 +158,7 @@ void {PACK}_{struct_name}({struct_name} {struct_var}, {RPCMEM_T} *{MEM}) {{
 {gen_packing_stmts(struct_members, struct_memtypes, packers)}
 }}"""
     return packer_def
+
 
 # Generate the unpacker function for a struct
 def gen_struct_unpacker(struct_name: str, struct_def: dict, unpackers: dict) -> str:
@@ -165,10 +174,12 @@ def gen_struct_unpacker(struct_name: str, struct_def: dict, unpackers: dict) -> 
 }}"""
     return unpacker_code
 
+
 # Generate a string representing the type and name of a function argument
 def type_space_name(arg):
     inner_typ, dims = inner_type_and_dims(arg["type"])
     return inner_typ + " " + arg["name"] + "".join([f"[{d}]" for d in dims])
+
 
 # Generate code for the proxy function definition
 def gen_proxy_def(function_name: str, func_decl: dict, packers: dict, unpackers: dict) -> str:
@@ -179,9 +190,14 @@ def gen_proxy_def(function_name: str, func_decl: dict, packers: dict, unpackers:
     result_var = "result"
 
     # Generate code for unpacking the result variable if the return type is not void
-    unpack_result = f"{return_type} {gen_unpack(result_var, return_type, unpackers)}" if return_type != "void" else ""
+    unpack_result = ""
+    if return_type != "void":
+        unpack_result = f"{return_type} {gen_unpack(result_var, return_type, unpackers)}"
+
     # Generate code for returning the result variable if the return type is not void
-    return_result = f"return {result_var};" if return_type != "void" else ""
+    return_result = ""
+    if return_result != "void":
+        return_result = f"return {result_var};"
 
     # Generate the parameter list for the function
     params = ", ".join([type_space_name(a) for a in arguments])
@@ -200,6 +216,7 @@ def gen_proxy_def(function_name: str, func_decl: dict, packers: dict, unpackers:
     {return_result}
 }}
 """
+
 
 # Generate code for the stub function definition
 def gen_stub_def(function_name: str, func_decl: dict, packers: dict, unpackers: dict) -> str:
@@ -228,6 +245,7 @@ def gen_stub_def(function_name: str, func_decl: dict, packers: dict, unpackers: 
 }}
 """
 
+
 # Generate code for matching and invoking stub methods in the dispatcher
 def match_and_invoke_stub_methods(func_decls: dict) -> str:
     dispatcher_code = ""
@@ -239,6 +257,7 @@ if (fname == "{function_name}") {{
 }}
 """
     return dispatcher_code
+
 
 # Generate code for the stub dispatcher
 def gen_stub_dispatcher(func_decls: dict) -> str:
@@ -264,26 +283,30 @@ respond:
 }}
 """
 
+
 # Write the generated proxy code to a file
 def write_proxy(proxy_code: str, idl_filename: str):
     with open(re.sub(r'\.idl', '.proxy.cpp', idl_filename), 'w') as f:
         f.write(proxy_code)
+
 
 # Write the generated stub code to a file
 def write_stub(stub_code: str, idl_filename: str):
     with open(re.sub(r'\.idl', '.stub.cpp', idl_filename), 'w') as f:
         f.write(stub_code)
 
+
 # Main function to execute the code generation
 def main():
-    # Check the command-line arguments and get the IDL filename from the command-line arguments
+    # Check the command-line arguments and get the IDL filename
     idl_filename = check_usage(sys.argv)
-    
+
     # Load the JSON representation of the IDL file
+    # Assumes the file exists (should be created by makefile)
     idl_json = {}
     with open(re.sub(r'\.idl', '.json', idl_filename), "r") as f:
         idl_json = json.load(f)
-    
+
     # Generate the include statement for the IDL file
     idl_include = f"#include \"{os.path.basename(idl_filename)}\""
 
