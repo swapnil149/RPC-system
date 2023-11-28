@@ -41,7 +41,6 @@ static struct {
 } *dummysock;
 #endif
 
-#include "../debugmacros.h"
 #include "basis.h"
 #include "mem.h"
 #include <stdio.h>
