@@ -26,7 +26,7 @@ struct __rpcmem_t {
 // Function to create a new RPC memory block.
 static __rpcmem_t *rpcmem_new() {
     __rpcmem_t *m = (__rpcmem_t *)malloc(sizeof(*m));  // Allocate memory for the structure.
-    assert(m);  // Ensure that the allocation was successful. TODO
+    assert(m);  // Ensure that the allocation was successful. TODO: Do we need assert statements?
     m->hp = 0;
     m->sp = m->capacity = INITIAL_CAPACITY;
     m->data = (char *)malloc(m->capacity);  // Allocate memory for the data block.
