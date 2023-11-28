@@ -6,7 +6,7 @@
 int main() {
     __rpcmem_t *mem = rpcmem_new();
     int x = 0xabcdef42;
-    string hello = "hello there!";
+    string hello = "abc";
 
     ERP("\nNO DATA\n");
     DEBUG("%d", mem->sp);
