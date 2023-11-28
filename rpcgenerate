@@ -205,10 +205,13 @@ def gen_proxy_def(function_name: str, func_decl: dict, packers: dict, unpackers:
     return f"""{return_type} {function_name}({params}) {{
     {RPCMEM_T} *{MEM} = rpcmem_new();
 
+    *GRADING << "Calling remote function {function_name}" << endl; 
 {gen_packing_stmts(argnames, argtys, packers)}
 
     rpc_send(\"{function_name.strip()}\", {MEM});
     rpc_recv({MEM});
+
+    *GRADING << "Received remote return value from {function_name}" << endl; 
 
     {unpack_result}
 
@@ -238,6 +241,7 @@ def gen_stub_def(function_name: str, func_decl: dict, packers: dict, unpackers: 
     return f"""void __{function_name}({RPCMEM_T} *{MEM}) {{
 {indent(arg_declarations, TAB)}
 {gen_unpacking_stmts(argnames, argtys, unpackers)}
+    *GRADING << "invoking function {function_name}(...)" << endl; 
     {save_result}{function_name}({", ".join(argnames)});
     {MEM}->hp = 0;
     {MEM}->sp = {MEM}->capacity;

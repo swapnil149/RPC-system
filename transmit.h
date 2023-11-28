@@ -1,6 +1,7 @@
 #ifndef TRANSMIT_H
 #define TRANSMIT_H
 
+#include "c150grading.h"
 #include <cstdio>
 #include <optional>
 #include <string>
@@ -77,8 +78,8 @@ static string rpc_recv(__rpcmem_t *mem) {
     int readlen =
         force_read((char *)&incoming_mem_size, sizeof(incoming_mem_size));
 
-    if (readlen == -1) // no read, return special bad-read code
-        return NO_RPC; // C++ is being annoying about returning nullptr
+    if (readlen == -1) // read failed, return special bad-recv code
+        return NO_RPC;
     while (mem->capacity < incoming_mem_size)
         rpcmem_expand(mem);
 
