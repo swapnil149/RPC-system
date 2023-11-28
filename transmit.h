@@ -31,8 +31,10 @@ using namespace std;
     "persists, a challenging class. A paradoxical mix of power and plight, "   \
     "An unnecessarily frustrating coding plight."
 
+// Maximum number of attempts for force_read to prevent infinite loops
 #define MAX_READ_ATTEMPTS 500
 
+// Definition of the structure representing an RPC socket.
 #ifndef RPCSOCKET // just a placeholder to remove warnings
 #define RPCSOCKET dummysock
 static struct {
@@ -41,13 +43,24 @@ static struct {
 } *dummysock;
 #endif
 
+// Inclusions of necessary headers for RPC communication
 #include "basis.h"
 #include "mem.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-static inline int force_read(char *buf, int len);
+// Function to perform a forceful read with specified buffer and length
+static inline int force_read(char *buf, int len) {
+    int attempts = 0;
+    for (int n_read = 0; n_read < len; attempts++) {
+        if (attempts > MAX_READ_ATTEMPTS)
+            return -1;
+        n_read += RPCSOCKET->read(buf + n_read, len - n_read);
+    }
+    return len;
+}
 
+// Function to send an RPC message with function name and RPC memory block.
 static void rpc_send(string fname, __rpcmem_t *mem) {
     __pack_string(fname, mem);
     int stack_size = mem->capacity - mem->sp;
@@ -58,6 +71,7 @@ static void rpc_send(string fname, __rpcmem_t *mem) {
     RPCSOCKET->write(mem->data + mem->sp, stack_size);
 }
 
+// Function to receive an RPC message and return the function name
 static string rpc_recv(__rpcmem_t *mem) {
     unsigned int incoming_mem_size;
     int readlen =
@@ -75,14 +89,4 @@ static string rpc_recv(__rpcmem_t *mem) {
     return fname;
 }
 
-static inline int force_read(char *buf, int len) {
-    int attempts = 0;
-    for (int n_read = 0; n_read < len; attempts++) {
-        if (attempts > MAX_READ_ATTEMPTS)
-            return -1;
-        n_read += RPCSOCKET->read(buf + n_read, len - n_read);
-    }
-    return len;
-}
-
-#endif
+#endif // TRANSMIT_H

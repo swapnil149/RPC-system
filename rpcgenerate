@@ -30,6 +30,7 @@ boilerplate = '''#include "mem.h"
 #include "basis.h"
 #include "transmit.h"'''
 
+# Basic data types supported by the system
 basis_types = ["int", "float", "bool", "string", "rpcptr_t", "void"]
 
 
@@ -43,7 +44,7 @@ def expand_includes(include: str) -> str:
     contents = '\n'.join(contents)
     return re.sub(r'#include ".*"\s*\n', '', contents)
 
-
+# Check command-line arguments
 def check_usage(args: list[str]) -> str:
     if len(args) != 2 or not sys.argv[1].endswith(".idl"):
         sys.stderr.write("USAGE: ./rpcgenerate [filename.idl]")
@@ -71,21 +72,17 @@ def gen_stub_boilerplate() -> str:
     ])
 
 
-# gets all the key value pairs for structs
+# gets all the key value pairs for structs from the IDL
 def get_idl_struct_definitions(idl_json: dict) -> dict:
     return {t: v for t, v in idl_json["types"].items() if v['type_of_type'] == 'struct'}
 
 
-# gets all the key value pairs for functions
+# gets all the key value pairs for functions from the IDL
 def get_idl_function_declarations(idl_json: dict) -> dict:
     return idl_json["functions"]
 
 
-# "x" "int" {"int" : ...} []        -> "__pack_int(x, mem);"
-# "x" "int" {"int" : ...} [3]       -> "for (int i = 0; i < 3; i++)
-#                                            __pack_int(x[i], mem);"
-# "x" "int" {"int" : ...} [3, 4, 5] -> "for (int i = 0; i < 3 * 4 * 5; i++)
-#                                            __pack_int(x[0][0][i], mem);"
+# Generate packing statements for a given variable and its type
 def gen_pack(var, inner_typ, packers: dict[str, str], dims=None) -> str:
     if not inner_typ in packers and not inner_typ in basis_types:
         raise RuntimeError(f"Type {inner_typ} not previously declared")
@@ -99,12 +96,7 @@ def gen_pack(var, inner_typ, packers: dict[str, str], dims=None) -> str:
     else:
         return f"{PACK}_{inner_typ}({var}, {MEM});"
 
-
-# "x" "int" {"int" : ...} []        -> "x = __unpack_int(mem);"
-# "x" "int" {"int" : ...} [3]       -> "for (int i = 3; i > 0; i--)
-#                                           x[i - 1] = __unpack_int(mem);"
-# "x" "int" {"int" : ...} [3, 4, 5] -> "for (int i = 3 * 4 * 5; i > 0; i--)
-#                                           x[0][0][i - 1] = __unpack_int(mem);"
+# Generate unpacking statements for a given variable and its type
 def gen_unpack(var, inner_typ, unpackers, dims=None) -> str:
     if not inner_typ in unpackers and not inner_typ in basis_types:
         raise RuntimeError(f"Type {inner_typ} not previously declared")
@@ -118,9 +110,7 @@ def gen_unpack(var, inner_typ, unpackers, dims=None) -> str:
     else:
         return f"{var} = {UNPACK}_{inner_typ}({MEM});"
 
-
-# int[3][4] -> int, [3, 4]
-# int       -> int, []
+# Extract inner type and dimensions from a raw type
 def inner_type_and_dims(raw_type: str) -> tuple[str, list[int]]:
     if raw_type.startswith('__'):
         inner_type = re.sub(r"[_\]\[\d]", "", raw_type)
@@ -129,12 +119,11 @@ def inner_type_and_dims(raw_type: str) -> tuple[str, list[int]]:
     return raw_type, []
 
 
-# [3, 4, 5] -> 3 * 4 * 5
-# [1] -> 1
+# Calculate the product of dimensions for array types
 def sumexp(nums: list[int]):
     return " * ".join([str(n) for n in nums])
 
-
+# Generate packing statements for a list of variables and their types
 def gen_packing_stmts(vars, types, packers) -> str:
     pack_stmts = []
     for var, typ in zip(vars, types):
@@ -142,7 +131,7 @@ def gen_packing_stmts(vars, types, packers) -> str:
         pack_stmts.append(gen_pack(var, inner_typ, packers, dims))
     return indent('\n'.join(pack_stmts), TAB)
 
-
+# Generate unpacking statements for a list of variables and their types
 def gen_unpacking_stmts(vars, types, unpackers) -> str:
     unpack_stmts = []
     for var, typ in zip(reversed(vars), reversed(types)):
@@ -150,7 +139,7 @@ def gen_unpacking_stmts(vars, types, unpackers) -> str:
         unpack_stmts.append(gen_unpack(var, inner_typ, unpackers, dims))
     return indent('\n'.join(unpack_stmts), TAB)
 
-
+# Generate the packer function for a struct
 def gen_struct_packer(struct_name: str, struct_def: dict, packers: dict) -> str:
     struct_var = "bandhi"
     struct_members = [struct_var + '.' + member["name"]
@@ -162,7 +151,7 @@ void {PACK}_{struct_name}({struct_name} {struct_var}, {RPCMEM_T} *{MEM}) {{
 }}"""
     return packer_def
 
-
+# Generate the unpacker function for a struct
 def gen_struct_unpacker(struct_name: str, struct_def: dict, unpackers: dict) -> str:
     result_var = "result"
     result_members = [result_var + '.' + member["name"]
@@ -176,12 +165,12 @@ def gen_struct_unpacker(struct_name: str, struct_def: dict, unpackers: dict) -> 
 }}"""
     return unpacker_code
 
-
+# Generate a string representing the type and name of a function argument
 def type_space_name(arg):
     inner_typ, dims = inner_type_and_dims(arg["type"])
     return inner_typ + " " + arg["name"] + "".join([f"[{d}]" for d in dims])
 
-
+# Generate code for the proxy function definition
 def gen_proxy_def(function_name: str, func_decl: dict, packers: dict, unpackers: dict) -> str:
     arguments = func_decl["arguments"]
     argnames = [a["name"] for a in arguments]
@@ -189,9 +178,12 @@ def gen_proxy_def(function_name: str, func_decl: dict, packers: dict, unpackers:
     return_type = func_decl["return_type"]
     result_var = "result"
 
+    # Generate code for unpacking the result variable if the return type is not void
     unpack_result = f"{return_type} {gen_unpack(result_var, return_type, unpackers)}" if return_type != "void" else ""
+    # Generate code for returning the result variable if the return type is not void
     return_result = f"return {result_var};" if return_type != "void" else ""
 
+    # Generate the parameter list for the function
     params = ", ".join([type_space_name(a) for a in arguments])
 
     return f"""{return_type} {function_name}({params}) {{
@@ -209,7 +201,7 @@ def gen_proxy_def(function_name: str, func_decl: dict, packers: dict, unpackers:
 }}
 """
 
-
+# Generate code for the stub function definition
 def gen_stub_def(function_name: str, func_decl: dict, packers: dict, unpackers: dict) -> str:
     arguments = func_decl["arguments"]
     return_type = func_decl["return_type"]
@@ -218,8 +210,10 @@ def gen_stub_def(function_name: str, func_decl: dict, packers: dict, unpackers: 
     argnames = [a["name"] for a in arguments]
     argtys = [a["type"] for a in arguments]
 
+    # Generate code for declaring arguments in the stub function
     arg_declarations = "\n".join([type_space_name(a) + ';' for a in arguments])
 
+    # Generate code for saving the result variable (if return type is not void)
     save_result = ""
     if return_type != "void":
         save_result = f"{return_type} {result_var} = "
@@ -234,7 +228,7 @@ def gen_stub_def(function_name: str, func_decl: dict, packers: dict, unpackers: 
 }}
 """
 
-
+# Generate code for matching and invoking stub methods in the dispatcher
 def match_and_invoke_stub_methods(func_decls: dict) -> str:
     dispatcher_code = ""
     for function_name in func_decls.keys():
@@ -246,7 +240,7 @@ if (fname == "{function_name}") {{
 """
     return dispatcher_code
 
-
+# Generate code for the stub dispatcher
 def gen_stub_dispatcher(func_decls: dict) -> str:
     return f"""
 // Stub dispatcher
@@ -270,54 +264,71 @@ respond:
 }}
 """
 
-
+# Write the generated proxy code to a file
 def write_proxy(proxy_code: str, idl_filename: str):
     with open(re.sub(r'\.idl', '.proxy.cpp', idl_filename), 'w') as f:
         f.write(proxy_code)
 
-
+# Write the generated stub code to a file
 def write_stub(stub_code: str, idl_filename: str):
     with open(re.sub(r'\.idl', '.stub.cpp', idl_filename), 'w') as f:
         f.write(stub_code)
 
-
+# Main function to execute the code generation
 def main():
+    # Check the command-line arguments and get the IDL filename from the command-line arguments
     idl_filename = check_usage(sys.argv)
+    
+    # Load the JSON representation of the IDL file
     idl_json = {}
     with open(re.sub(r'\.idl', '.json', idl_filename), "r") as f:
         idl_json = json.load(f)
+    
+    # Generate the include statement for the IDL file
     idl_include = f"#include \"{os.path.basename(idl_filename)}\""
 
+    # Generate boilerplate code for the proxy and stub
     proxy_boilerplate = gen_proxy_boilerplate()
     stub_boilerplate = gen_stub_boilerplate()
 
+    # Extract struct definitions and function declarations from the IDL JSON
     struct_defs = get_idl_struct_definitions(idl_json)  # python objects
     func_decls = get_idl_function_declarations(idl_json)  # python objects
 
+    # Initialize dictionaries for packers and unpackers
     packers = {}
     unpackers = {}
+
+    # Generate packing and unpacking functions for each struct definition
     for name, struct_def in reversed(struct_defs.items()):
         packers[name] = gen_struct_packer(name, struct_def, packers)
         unpackers[name] = gen_struct_unpacker(name, struct_def, unpackers)
 
+    # Join packing and unpacking functions into strings
     packer_funcs = "\n".join(packers.values())
     unpacker_funcs = "\n".join(unpackers.values()) + '\n'
+
+    # Generate proxy and stub functions for each function declaration
     proxy_funcs = "".join([gen_proxy_def(name, dec, packers, unpackers) + '\n'
                            for name, dec in func_decls.items()])
     stub_funcs = "".join([gen_stub_def(name, dec, packers, unpackers) + '\n'
                           for name, dec in func_decls.items()])
 
+    # Generate code for the stub dispatcher
     stub_dispatcher = gen_stub_dispatcher(func_decls)
 
+    # Combine all the generated code into strings for proxy and stub
     proxy_code = '\n'.join([includes, idl_include, proxy_boilerplate,
                             packer_funcs, unpacker_funcs, proxy_funcs])
     stub_code = '\n'.join([includes, idl_include, stub_boilerplate,
                            packer_funcs, unpacker_funcs, stub_funcs,
                            stub_dispatcher])
 
+    # Write the generated proxy and stub code to files
     write_proxy(proxy_code, idl_filename)
     write_stub(stub_code, idl_filename)
 
 
+# Execute the code generation when the script is run
 if __name__ == '__main__':
     main()

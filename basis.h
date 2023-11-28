@@ -8,34 +8,41 @@
 
 using namespace std;
 
-//
-// PACK
-//
-// pre-decrement the stack pointer
-//
+// Declaration of basic packing and unpacking functions for RPC communication.
 
+// Helper function  to ensure there is enough room in the RPC memory 
+//for the specified number of bytes
 static inline void make_room_for(__rpcmem_t *m, int n_bytes) {
     while (m->hp + n_bytes >= m->sp)
         rpcmem_expand(m);
 }
 
+//PACK
+// These functions pre-decrement the stack pointer and pack data into 
+//the RPC memory block.
+
+// Pack an integer into the RPC memory
 static void __pack_int(unsigned x, __rpcmem_t *m) {
     make_room_for(m, sizeof(x));
     for (unsigned i = 0; i < sizeof(x); i++)
         m->data[--m->sp] = (unsigned char)(x >> 8 * i);
 }
 
+// Pack a boolean into the RPC memory
 static void __pack_bool(bool b, __rpcmem_t *m) {
     make_room_for(m, 1);
     m->data[--m->sp] = (char)b;
 }
 
+// Pack an RPC pointer into the RPC memory
 static void __pack_rpcptr(__rpcptr_t x, __rpcmem_t *m) { __pack_int(x, m); }
 
+// Pack a floating-point number into the RPC memory
 static void __pack_float(float f, __rpcmem_t *m) {
     __pack_int(*(unsigned *)&f, m);
 }
 
+// Pack a string into the RPC memory
 static void __pack_string(string s, __rpcmem_t *m) {
     __rpcptr_t strptr = m->hp;        // Get the current heap pointer
     int strlen = (int)s.length() + 1; // Includes null byte
@@ -47,12 +54,10 @@ static void __pack_string(string s, __rpcmem_t *m) {
     m->hp += strlen;
 }
 
-//
 // UNPACK
-//
-// post-increment the stack pointer
-//
+// These functions post-increment the stack pointer and unpack data from the RPC memory
 
+// Unpack an integer from the RPC memory
 static int __unpack_int(__rpcmem_t *m) {
     unsigned char bytes[4];
     for (int i = 4; i > 0; i--)
@@ -60,15 +65,19 @@ static int __unpack_int(__rpcmem_t *m) {
     return bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24);
 }
 
+// Unpack a boolean from the RPC memory
 static bool __unpack_bool(__rpcmem_t *m) { return m->data[m->sp++]; }
 
+// Unpack an RPC pointer from the RPC memory
 static __rpcptr_t __unpack_rpcptr(__rpcmem_t *m) { return __unpack_int(m); }
 
+// Unpack a floating-point number from the RPC memory
 static float __unpack_float(__rpcmem_t *m) {
     int x = __unpack_int(m);
     return *(float *)&x;
 }
 
+// Unpack a string from the RPC memory
 static string __unpack_string(__rpcmem_t *m) {
     __rpcptr_t strptr = __unpack_rpcptr(m);
     int strlen = __unpack_int(m);
@@ -79,4 +88,4 @@ static string __unpack_string(__rpcmem_t *m) {
     return result;
 }
 
-#endif
+#endif //BASIS_H
